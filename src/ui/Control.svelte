@@ -105,7 +105,7 @@
       <section class="display-card">
         <div class="card-icon"><Icon name="monitor" size={24} /></div>
         <div class="display-details"><h2>그릴 화면</h2><p>{selected ? `${Math.round(selected.width)} × ${Math.round(selected.height)} · ${Math.round(selected.scaleFactor * 100)}% 배율` : '화면을 찾고 있습니다'}</p></div>
-        <select aria-label="그릴 화면 선택" value={appState?.activeDisplayId ?? ''} disabled={!ready} onchange={(e) => action(async () => accept(await bridge.selectDisplay(e.currentTarget.value)))}>{#each appState?.displays.filter((d) => d.connected) ?? [] as display}<option value={display.id}>{display.name}{display.isPrimary ? ' · 기본' : ''}</option>{/each}</select>
+        <select aria-label="그릴 화면 선택" value={appState?.activeDisplayId ?? ''} disabled={!ready} onchange={(e) => { const selectedId = e.currentTarget.value; void action(async () => accept(await bridge.selectDisplay(selectedId))); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as display}<option value={display.id}>{display.name}{display.isPrimary ? ' · 기본' : ''}</option>{/each}</select>
       </section>
       <section class="quick-guide" aria-label="사용 순서">
         <div><span class="step-number">01</span><h3>그리고</h3><p>펜·색상·굵기를 골라<br />필요한 곳에 표시하세요.</p></div>
