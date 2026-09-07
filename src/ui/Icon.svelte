@@ -1,6 +1,9 @@
 <script lang="ts">
   let { name, size = 20 }: { name: string; size?: number } = $props();
   const paths: Record<string, string> = {
+    grip: 'M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01',
+    collapse: 'm8 5 7 7-7 7',
+    expand: 'm15 5-7 7 7 7',
     pen: 'm15 4 5 5M4 20l5-1L20 8a2.1 2.1 0 0 0-5-5L4 14l-1 7 7-2',
     text: 'M4 5h16M12 5v15M8 20h8M4 5v3M20 5v3',
     eraser: 'm15 3 6 6-11 11H5l-3-3a2 2 0 0 1 0-3L13 3a1.5 1.5 0 0 1 2 0ZM7 9l8 8M10 20h11',

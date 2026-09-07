@@ -4,8 +4,7 @@
 .drawing-surface.erase-tool { cursor: none; }
 .draw-frame { position: fixed; inset: 0; border: 1px solid #ffcf5680; pointer-events: none; }
 .eraser-cursor { position: fixed; display: none; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #0009; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; background: #ffffff10; }
-.toolbar-area { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10; user-select: none; }
-.toolbar { display: flex; align-items: center; gap: 5px; padding: 7px 9px; background: #20232bfa; border: 1px solid #4c505d; border-radius: 14px; box-shadow: 0 7px 24px #0004; color: #c4cbd7; white-space: nowrap; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 7px 9px; background: #20232bfa; border: 1px solid #4c505d; border-radius: 14px; box-shadow: 0 7px 24px #0004; color: #c4cbd7; white-space: nowrap; }
 .toolbar-brand { color: #ffcf56; display: flex; padding: 5px 7px 5px 3px; }
 .toolbar button { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 7px; height: 35px; min-width: 34px; padding: 6px; }
 .toolbar button:hover { background: #343944; }
@@ -18,7 +17,7 @@
 .toolbar .interact-button { gap: 6px; padding: 6px 8px; font-size: 11px; color: #c4cddc; }
 .interact-button kbd { font-size: 9px; padding: 1px 4px; margin-left: 2px; }
 .overlay-display-select { background: #2e3440; border: 1px solid #414958; border-radius: 6px; padding: 6px; max-width: 140px; color: #cbd3e2; font-size: 10px; }
-.palette-panel { width: 328px; max-height: calc(100vh - 160px); overflow-y: auto; margin: 9px auto 0; padding: 17px; border: 1px solid #4a505e; border-radius: 16px; box-shadow: 0 8px 24px #0004; background: #242831; }
+.palette-panel { width: 100%; margin: 0; padding: 17px; border: 1px solid #4a505e; border-radius: 16px; box-shadow: 0 8px 24px #0004; background: #242831; }
 .palette-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 11px; color: #d3d9e3; }
 .palette-heading code { color: #99a4b7; font-size: 10px; }
 .palette-swatches { display: flex; align-items: center; gap: 10px; }

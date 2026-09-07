@@ -5,6 +5,7 @@
   import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
   import { DEFAULT_SETTINGS, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
+  import ToolbarFrame from './ToolbarFrame.svelte';
   import ColorPalette from './ColorPalette.svelte';
   import { SettingsWriter } from '../app/settings-writer';
   import { isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
@@ -247,8 +248,7 @@
 
 {#if drawing}
   <div class="draw-frame" aria-hidden="true"></div>
-  <div class="toolbar-area">
-    <div class="toolbar" role="toolbar" aria-label="그리기 도구">
+  <ToolbarFrame {displayId} showPanel={showPalette} oncollapse={() => showPalette = false} oninteract={() => action(() => bridge.setMode('interact'))}>
       <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
       <div class="tool-group">
         <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title="펜 (P)" aria-label="펜" onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
@@ -267,16 +267,15 @@
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
       <button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
-    </div>
-    {#if showPalette}
+    {#snippet panel()}
       <div class="palette-panel">
         <div class="palette-heading"><span>펜 색상</span><code>{settings.color.toUpperCase()}</code></div>
         <ColorPalette value={settings.color} colors={settings.quickColors} onchange={(color) => updateSetting({ color })} onpalettechange={(quickColors) => updateSetting({ quickColors })} />
         <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateSetting({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateSetting({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
         <p>숫자 1–6으로 색상 · [ ]로 굵기 조절</p>
       </div>
-    {/if}
-  </div>
+    {/snippet}
+  </ToolbarFrame>
   <div class="mode-hint"><span class="hint-dot"></span><strong>{tool === 'text' ? '텍스트' : tool === 'eraser' ? '지우개' : '그리기'}</strong><span class="hint-separator"></span>{#if tool === 'text'}화면을 클릭해 입력하세요{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
 {:else if !native}
   <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>다시 그리기</button><span>그림은 유지됩니다 · {currentDisplay?.name ?? '미리보기'}</span></div>
