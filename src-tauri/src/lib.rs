@@ -20,6 +20,7 @@ struct RuntimeState {
     settings_path: PathBuf,
     registered: Vec<Shortcut>,
     pressed: HashSet<u32>,
+    capturing_shortcut: bool,
 }
 struct Session(Mutex<RuntimeState>);
 struct TrayShortcuts {
@@ -239,6 +240,15 @@ fn shortcuts(settings: &AppSettings) -> Result<Vec<Shortcut>, String> {
             "전역 단축키에는 Alt·Ctrl·Shift·Command 중 하나 이상의 보조 키가 필요합니다.".into(),
         );
     }
+    let settings_key = Shortcut::from_str(if cfg!(target_os = "macos") {
+        "Command+Comma"
+    } else {
+        "Control+Comma"
+    })
+    .map_err(|e| e.to_string())?;
+    if [a.id(), b.id()].contains(&settings_key.id()) {
+        return Err("이 조합은 설정 열기에 사용됩니다. 다른 단축키를 지정해 주세요.".into());
+    }
     Ok(vec![a, b])
 }
 fn replace_shortcuts(
@@ -381,14 +391,22 @@ async fn select_display(
 async fn update_settings(
     window: WebviewWindow,
     app: tauri::AppHandle,
-    settings: AppSettings,
+    settings: SettingsPatch,
 ) -> Result<AppState, String> {
     native_command(app.clone(), move || {
         authorized(&window)?;
-        let wanted = shortcuts(&settings)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
+        let settings = settings.apply(&d.app.settings);
+        let wanted = shortcuts(&settings)?;
+        if d.capturing_shortcut
+            && (settings.toggle_shortcut != d.app.settings.toggle_shortcut
+                || settings.clear_shortcut != d.app.settings.clear_shortcut)
+        {
+            return Err("단축키 입력을 마친 뒤 적용해 주세요.".into());
+        }
         let old = d.registered.clone();
+        let wanted = if d.capturing_shortcut { vec![] } else { wanted };
         if let Err(e) = replace_shortcuts(&app, &mut d, wanted) {
             let _ = change_mode(&app, &mut d, Mode::Interact);
             report(&app, &mut d, e.clone());
@@ -413,6 +431,40 @@ async fn update_settings(
             .map(|e| format!("설정은 저장했지만 메뉴 단축키 표시를 갱신하지 못했습니다: {e}"));
         emit_state(&app, &mut d);
         Ok(d.app.clone())
+    })
+    .await
+}
+fn end_shortcut_capture(app: &tauri::AppHandle, d: &mut RuntimeState) -> Result<(), String> {
+    if d.capturing_shortcut {
+        d.capturing_shortcut = false;
+        let wanted = shortcuts(&d.app.settings)?;
+        if let Err(e) = replace_shortcuts(app, d, wanted) {
+            report(app, d, e.clone());
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+#[tauri::command]
+async fn capture_shortcut(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    active: bool,
+) -> Result<(), String> {
+    native_command(app.clone(), move || {
+        control_only(&window)?;
+        let s = lock(&app);
+        let mut d = s.0.lock().map_err(|e| e.to_string())?;
+        if active {
+            if !window.is_focused().map_err(|e| e.to_string())? {
+                return Err("설정 창을 선택한 뒤 단축키를 입력해 주세요.".into());
+            }
+            replace_shortcuts(&app, &mut d, vec![])?;
+            d.capturing_shortcut = true;
+        } else {
+            end_shortcut_capture(&app, &mut d)?;
+        }
+        Ok(())
     })
     .await
 }
@@ -505,7 +557,10 @@ fn open_control(app: &tauri::AppHandle) -> Result<(), String> {
         .get_webview_window("control")
         .ok_or("설정 창이 없습니다.")?;
     window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())
+    window.set_focus().map_err(|e| e.to_string())?;
+    window
+        .emit("brush-open-settings", ())
+        .map_err(|e| e.to_string())
 }
 #[tauri::command]
 async fn show_control(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
@@ -526,7 +581,13 @@ async fn quit_app(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), St
     .await
 }
 fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
-    let control = MenuItem::with_id(app, "control", "설정 열기", true, None::<&str>)?;
+    let control = MenuItem::with_id(
+        app,
+        "control",
+        "설정 열기",
+        true,
+        Some("CommandOrControl+Comma"),
+    )?;
     let draw = MenuItem::with_id(app, "draw", "그리기", true, Some(&settings.toggle_shortcut))?;
     let interact = MenuItem::with_id(
         app,
@@ -603,6 +664,14 @@ fn tray_pixels() -> Vec<u8> {
 
 pub fn run() {
     tauri::Builder::default()
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "open-settings" {
+                let handle = app.clone();
+                let _ = dispatch_native(app, move || {
+                    let _ = open_control(&handle);
+                });
+            }
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, key, event| {
@@ -614,6 +683,9 @@ pub fn run() {
                         if let Ok(mut d) = state.0.lock() {
                             if !pressed {
                                 d.pressed.remove(&id);
+                                return;
+                            }
+                            if d.capturing_shortcut {
                                 return;
                             }
                             if !d.pressed.insert(id) {
@@ -644,6 +716,7 @@ pub fn run() {
             set_mode,
             select_display,
             update_settings,
+            capture_shortcut,
             get_scene,
             apply_edit,
             clear_all,
@@ -674,6 +747,7 @@ pub fn run() {
                 settings_path: path,
                 registered: vec![],
                 pressed: HashSet::new(),
+                capturing_shortcut: false,
             })));
             {
                 let state = app.state::<Session>();
@@ -693,6 +767,26 @@ pub fn run() {
             .inner_size(940., 760.)
             .min_inner_size(680., 540.)
             .build()?;
+            #[cfg(target_os = "macos")]
+            {
+                let menu = Menu::default(app.handle())?;
+                if let Some(submenu) = menu
+                    .items()?
+                    .first()
+                    .and_then(|item| item.as_submenu())
+                    .cloned()
+                {
+                    let settings_item = MenuItem::with_id(
+                        app,
+                        "open-settings",
+                        "설정…",
+                        true,
+                        Some("Command+Comma"),
+                    )?;
+                    submenu.insert(&settings_item, 1)?;
+                }
+                app.set_menu(menu)?;
+            }
             tray(app.handle(), &loaded)?;
             {
                 let state = app.state::<Session>();
@@ -736,6 +830,19 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if window.label() == "control" {
+                if matches!(
+                    event,
+                    tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Focused(false)
+                ) {
+                    let app = window.app_handle().clone();
+                    let handle = app.clone();
+                    let _ = dispatch_native(&app, move || {
+                        let s = lock(&handle);
+                        if let Ok(mut d) = s.0.lock() {
+                            let _ = end_shortcut_capture(&handle, &mut d);
+                        };
+                    });
+                }
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
@@ -752,6 +859,7 @@ mod tests {
     #[test]
     fn shortcut_validation_rejects_equivalent_keys_and_bare_letters() {
         let mut settings = AppSettings {
+            toggle_shortcut: "Alt+Shift+D".into(),
             clear_shortcut: "Shift+Alt+D".into(),
             ..AppSettings::default()
         };
@@ -761,5 +869,27 @@ mod tests {
         settings.clear_shortcut = "not a shortcut".into();
         assert!(shortcuts(&settings).is_err());
         assert!(shortcuts(&AppSettings::default()).is_ok());
+    }
+    #[test]
+    fn recorded_key_codes_parse_and_settings_shortcut_is_reserved() {
+        for key in [
+            "Shift+Super+D",
+            "Control+Alt+F6",
+            "Alt+BracketLeft",
+            "Alt+Backquote",
+            "Alt+ArrowLeft",
+        ] {
+            assert!(Shortcut::from_str(key).is_ok(), "{key}");
+        }
+        let settings = AppSettings {
+            toggle_shortcut: if cfg!(target_os = "macos") {
+                "Command+Comma"
+            } else {
+                "Control+Comma"
+            }
+            .into(),
+            ..AppSettings::default()
+        };
+        assert!(shortcuts(&settings).is_err());
     }
 }

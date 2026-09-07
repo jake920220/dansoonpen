@@ -55,6 +55,19 @@
 .range-value output { width: 36px; text-align: right; font-size: 11px; color: #d7be83; }
 .quick-colors { display: flex; gap: 9px; }
 .shortcut-input { width: 190px; border: 1px solid #424958; background: #242833; border-radius: 7px; padding: 8px 10px; color: #e0e5ee; font-size: 12px; }
+.shortcut-input { cursor: pointer; text-align: center; min-height: 37px; }
+.shortcut-input.recording { border-color: #ffcf56; background: #302c22; }
+.shortcut-recorder { display: flex; flex-direction: column; gap: 5px; }
+.recorder-hint { font-size: 9px; color: #8f9bb0; text-align: right; min-height: 12px; }
+.pen-preview { color: var(--ink); padding: 7px 15px; border-radius: 12px; border: 1px solid #333b48; background: #20242d; margin-bottom: 17px; }
+.pen-preview svg { display: block; width: 100%; height: 62px; }
+.pen-preview > span { display: flex; justify-content: space-between; color: #a6b2c4; font-size: 10px; padding: 4px 0 7px; }
+.pen-preview code { color: var(--ink); font-size: 10px; }
+.settings-palette { padding: 2px 0 10px; }
+.appearance-status { font-size: 10px; color: #8da99f; margin: 15px 0 0; }
+.shortcut-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.shortcut-actions button { font-size: 11px; padding: 8px 11px; }
+.shortcut-actions .success { font-size: 10px; }
 .field-hint { color: #858fa1; font-size: 10px; line-height: 1.8; margin: 14px 0 0; }
 .checkbox-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .checkbox-row strong { display: block; font-weight: 500; font-size: 12px; margin-bottom: 6px; }

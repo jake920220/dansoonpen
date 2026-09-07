@@ -18,7 +18,7 @@
 .toolbar .interact-button { gap: 6px; padding: 6px 8px; font-size: 11px; color: #c4cddc; }
 .interact-button kbd { font-size: 9px; padding: 1px 4px; margin-left: 2px; }
 .overlay-display-select { background: #2e3440; border: 1px solid #414958; border-radius: 6px; padding: 6px; max-width: 140px; color: #cbd3e2; font-size: 10px; }
-.palette-panel { width: 283px; margin: 9px auto 0; padding: 17px; border: 1px solid #4a505e; border-radius: 12px; box-shadow: 0 8px 24px #0004; background: #242831; }
+.palette-panel { width: 328px; max-height: calc(100vh - 160px); overflow-y: auto; margin: 9px auto 0; padding: 17px; border: 1px solid #4a505e; border-radius: 16px; box-shadow: 0 8px 24px #0004; background: #242831; }
 .palette-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 11px; color: #d3d9e3; }
 .palette-heading code { color: #99a4b7; font-size: 10px; }
 .palette-swatches { display: flex; align-items: center; gap: 10px; }

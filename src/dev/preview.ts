@@ -34,7 +34,8 @@ export const preview = {
       case 'get_scene': result = structuredClone(scene); break;
       case 'set_mode': state.mode = args.mode as AppState['mode']; result = updateState(); break;
       case 'select_display': state.activeDisplayId = String(args.displayId); result = updateState(); break;
-      case 'update_settings': state.settings = structuredClone(args.settings as AppState['settings']); result = updateState(); break;
+      case 'update_settings': state.settings = { ...state.settings, ...structuredClone(args.settings as Partial<AppState['settings']>) }; result = updateState(); break;
+      case 'capture_shortcut': break;
       case 'apply_edit': {
         const edit = args.edit as SceneEdit;
         if (edit.clearGeneration < scene.clearGeneration) { result = structuredClone(scene); break; }
@@ -48,7 +49,7 @@ export const preview = {
         break;
       case 'undo': { const previous = history.pop(); if (previous) { future.push(scene.annotations); updateScene(previous); } break; }
       case 'redo': { const next = future.pop(); if (next) { history.push(scene.annotations); updateScene(next); } break; }
-      case 'show_control': location.href = '/?view=control'; break;
+      case 'show_control': location.href = '/?view=control&tab=settings'; break;
       case 'quit_app': state.mode = 'interact'; result = updateState(); break;
       default: throw new Error(`Unknown preview command: ${command}`);
     }

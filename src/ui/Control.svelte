@@ -3,34 +3,62 @@
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
   import { DEFAULT_SETTINGS, type AppState, type AppSettings } from '../shared/types';
   import Icon from './Icon.svelte';
+  import ColorPalette from './ColorPalette.svelte';
+  import ShortcutRecorder from './ShortcutRecorder.svelte';
+  import { SettingsWriter } from '../app/settings-writer';
+  import { isSettingsShortcut } from '../app/shortcuts';
   let appState = $state.raw<AppState | null>(null);
   let draft = $state<AppSettings>(structuredClone(DEFAULT_SETTINGS));
   let dirty = $state(false);
-  let tab = $state<'start' | 'settings' | 'about'>('start');
+  let tab = $state<'start' | 'settings' | 'about'>(new URLSearchParams(location.search).get('tab') === 'settings' ? 'settings' : 'start');
   let busy = $state(false);
   let error = $state('');
   let saved = $state(false);
+  let savingAppearance = $state(false);
+  let appearanceError = $state('');
+  let optimistic: Partial<AppSettings> = {};
+  let captureEdits: Promise<void> = Promise.resolve();
+  let recording = $state(false);
   let ready = $derived(appState !== null && !busy);
   const selected = $derived(appState?.displays.find((d) => d.id === appState?.activeDisplayId));
 
   function accept(next: AppState) {
     if (appState && next.revision < appState.revision) return;
     appState = next;
-    if (!dirty) draft = structuredClone(next.settings);
+    const shortcuts = dirty ? { toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut } : {};
+    draft = { ...structuredClone(next.settings), ...optimistic, ...shortcuts };
+  }
+  const writer = new SettingsWriter(bridge.updateSettings, accept, (pending) => {
+    optimistic = pending; savingAppearance = Object.keys(pending).length > 0;
+    if (appState) accept(appState);
+  }, (e) => { appearanceError = message(e); });
+  function appearance(patch: Partial<AppSettings>) { appearanceError = ''; writer.update(patch); }
+  function capture(active: boolean): Promise<void> {
+    recording = active;
+    const request = captureEdits.then(() => bridge.captureShortcut(active));
+    captureEdits = request.catch((e) => { error = message(e); });
+    return request;
+  }
+  function keyboard(event: KeyboardEvent) {
+    if (!recording && isSettingsShortcut(event)) { event.preventDefault(); tab = 'settings'; }
   }
   onMount(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
+    let stopSettings: (() => void) | undefined;
     void (async () => {
       try {
         const off = await bridge.onState((next) => { if (!disposed) accept(next); });
         if (disposed) { off(); return; }
         unlisten = off;
+        const stop = await bridge.onOpenSettings(() => { if (!disposed) tab = 'settings'; });
+        if (disposed) { stop(); return; }
+        stopSettings = stop;
         const next = await bridge.getState();
         if (!disposed) accept(next);
       } catch (e) { if (!disposed) error = message(e); }
     })();
-    return () => { disposed = true; unlisten?.(); };
+    return () => { disposed = true; unlisten?.(); stopSettings?.(); void writer.flush(); void capture(false).catch(() => {}); };
   });
   async function action(fn: () => Promise<unknown>) {
     if (busy) return;
@@ -44,11 +72,14 @@
   function change() { dirty = true; saved = false; }
   async function save() {
     await action(async () => {
-      const next = await bridge.updateSettings($state.snapshot(draft));
+      await captureEdits;
+      const next = await bridge.updateSettings({ toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut });
       dirty = false; accept(next); saved = true;
     });
   }
 </script>
+
+<svelte:window onkeydown={keyboard} onblur={() => { if (recording) void capture(false).catch(() => {}); }} />
 
 <div class="control-shell">
   <aside class="sidebar">
@@ -83,22 +114,25 @@
       </section>
       <div class="sharing-note"><Icon name="monitor" size={17} /><p>화면공유는 <strong>모니터 전체</strong>로 선택해 주세요. 특정 앱 창만 공유하면 그림이 전달되지 않을 수 있습니다.</p></div>
     {:else if tab === 'settings'}
-      <div class="settings-heading"><h1>설정</h1><p>강의 흐름에 맞게, 자주 쓰는 도구를 준비하세요.</p></div>
+      <div class="settings-heading"><h1>설정</h1><p>색상과 굵기는 바꾸는 즉시 저장되고 다음 필기에 적용됩니다.</p></div>
+      {#if appearanceError}<div class="error-box" role="alert">{appearanceError}</div>{/if}
       <form onsubmit={(e) => { e.preventDefault(); void save(); }}>
-        <fieldset disabled={busy}>
+        <fieldset disabled={!ready}>
         <section class="settings-section"><h2><Icon name="pen" size={18} />기본 펜</h2>
-          <div class="setting-row"><label for="default-color">시작 색상</label><div class="color-value"><input id="default-color" type="color" bind:value={draft.color} oninput={change} /><code>{draft.color.toUpperCase()}</code></div></div>
-          <div class="setting-row"><label for="pen-width">펜 굵기</label><div class="range-value"><input id="pen-width" type="range" min="1" max="32" step="1" bind:value={draft.width} oninput={change} /><output>{draft.width}px</output></div></div>
-          <div class="setting-row"><label for="text-size">글자 크기</label><div class="range-value"><input id="text-size" type="range" min="12" max="96" step="2" bind:value={draft.textSize} oninput={change} /><output>{draft.textSize}px</output></div></div>
-          <div class="setting-row"><span>빠른 색상</span><div class="quick-colors">{#each draft.quickColors as color, i}<input aria-label={`빠른 색상 ${i + 1}`} type="color" value={color} oninput={(e) => { draft.quickColors[i] = e.currentTarget.value; change(); }} />{/each}</div></div>
+          <div class="pen-preview" style:--ink={draft.color}><svg viewBox="0 0 360 70" aria-hidden="true"><path d="M18 47C60 10 70 64 112 34S159 57 210 27S277 40 337 23" fill="none" stroke="currentColor" stroke-width={draft.width} stroke-linecap="round" /></svg><span>{draft.width}px <code>{draft.color.toUpperCase()}</code></span></div>
+          <div class="settings-palette"><ColorPalette value={draft.color} colors={draft.quickColors} onchange={(color) => appearance({ color })} onpalettechange={(quickColors) => appearance({ quickColors })} /></div>
+          <div class="setting-row"><label for="pen-width">펜 굵기</label><div class="range-value"><input id="pen-width" type="range" min="1" max="32" step="1" value={draft.width} oninput={(e) => appearance({ width: Number(e.currentTarget.value) })} /><output>{draft.width}px</output></div></div>
+          <div class="setting-row"><label for="text-size">글자 크기</label><div class="range-value"><input id="text-size" type="range" min="12" max="96" step="2" value={draft.textSize} oninput={(e) => appearance({ textSize: Number(e.currentTarget.value) })} /><output>{draft.textSize}px</output></div></div>
+          <p class="appearance-status" role="status">{savingAppearance ? '저장 중…' : appearanceError ? '변경을 저장하지 못했습니다.' : '자동 저장 · 기존 필기의 색상은 유지됩니다.'}</p>
         </section>
         <section class="settings-section"><h2><Icon name="keyboard" size={18} />단축키</h2>
-          <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><input class="shortcut-input" id="toggle-shortcut" bind:value={draft.toggleShortcut} oninput={change} spellcheck="false" autocomplete="off" /></div>
-          <div class="setting-row"><label for="clear-shortcut">전체 지우기</label><input class="shortcut-input" id="clear-shortcut" bind:value={draft.clearShortcut} oninput={change} spellcheck="false" autocomplete="off" /></div>
-          <p class="field-hint">예: Alt+Shift+D · Mac의 Option은 Alt로 입력하세요. 다른 앱과 겹치면 다른 조합을 지정해 주세요.</p>
+          <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>
+          <div class="setting-row"><label for="clear-shortcut">전체 지우기</label><ShortcutRecorder id="clear-shortcut" value={draft.clearShortcut} onchange={(value) => { draft.clearShortcut = value; change(); }} {capture} /></div>
+          <p class="field-hint">입력칸을 클릭하고 원하는 키를 함께 누른 뒤 놓으세요. ‘단축키 적용’을 누르면 사용됩니다. 다른 앱의 단축키·특수문자 입력과 겹치면 조합을 바꿔 주세요.</p>
+          <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; change(); }}>왼손 추천 조합</button><span class="success" role="status">{saved ? '단축키를 적용했습니다.' : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>단축키 적용</button></div>
         </section>
-        <section class="settings-section"><label class="checkbox-row"><span><strong>애니메이션 줄이기</strong><small>지우기 명령을 누르면 그림을 즉시 지웁니다.</small></span><input type="checkbox" bind:checked={draft.reduceMotion} onchange={change} /></label></section>
-        <div class="settings-actions"><span class="success" role="status">{saved ? '설정을 저장했습니다.' : ''}</span><button type="button" class="secondary" onclick={() => { draft = structuredClone(DEFAULT_SETTINGS); change(); }}>기본값으로</button><button class="primary" type="submit" disabled={!ready || !dirty}>설정 저장</button></div>
+        <section class="settings-section"><label class="checkbox-row"><span><strong>애니메이션 줄이기</strong><small>지우기 명령을 누르면 그림을 즉시 지웁니다.</small></span><input type="checkbox" checked={draft.reduceMotion} onchange={(e) => appearance({ reduceMotion: e.currentTarget.checked })} /></label></section>
+        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; change(); }}>기본값으로</button></div>
         </fieldset>
       </form>
     {:else}

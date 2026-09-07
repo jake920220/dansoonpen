@@ -114,24 +114,34 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 2,
             color: "#ffcf56".into(),
-            width: 5.,
+            width: 12.,
             text_size: 28.,
             quick_colors: [
                 "#ffcf56", "#ff6b6b", "#57d9c6", "#78a9ff", "#c4a0ff", "#ffffff",
             ]
             .map(String::from)
             .to_vec(),
-            toggle_shortcut: "Alt+Shift+D".into(),
-            clear_shortcut: "Alt+Shift+X".into(),
+            toggle_shortcut: if cfg!(target_os = "macos") {
+                "Alt+Z"
+            } else {
+                "Alt+Shift+Z"
+            }
+            .into(),
+            clear_shortcut: if cfg!(target_os = "macos") {
+                "Alt+X"
+            } else {
+                "Alt+Shift+X"
+            }
+            .into(),
             reduce_motion: false,
         }
     }
 }
 impl AppSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 1
+        if self.version != 2
             || !valid_color(&self.color)
             || !finite_range(self.width, 1., 32.)
             || !finite_range(self.text_size, 8., 144.)
@@ -143,6 +153,40 @@ impl AppSettings {
             return Err("설정 형식 또는 허용 범위가 올바르지 않습니다.".into());
         }
         Ok(())
+    }
+}
+// Apply only fields edited by a window, so delayed palette writes cannot overwrite
+// shortcut or color changes made in another window.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SettingsPatch {
+    pub version: Option<u32>,
+    pub color: Option<String>,
+    pub width: Option<f64>,
+    pub text_size: Option<f64>,
+    pub quick_colors: Option<Vec<String>>,
+    pub toggle_shortcut: Option<String>,
+    pub clear_shortcut: Option<String>,
+    pub reduce_motion: Option<bool>,
+}
+impl SettingsPatch {
+    pub fn apply(self, current: &AppSettings) -> AppSettings {
+        AppSettings {
+            version: self.version.unwrap_or(current.version),
+            color: self.color.unwrap_or_else(|| current.color.clone()),
+            width: self.width.unwrap_or(current.width),
+            text_size: self.text_size.unwrap_or(current.text_size),
+            quick_colors: self
+                .quick_colors
+                .unwrap_or_else(|| current.quick_colors.clone()),
+            toggle_shortcut: self
+                .toggle_shortcut
+                .unwrap_or_else(|| current.toggle_shortcut.clone()),
+            clear_shortcut: self
+                .clear_shortcut
+                .unwrap_or_else(|| current.clear_shortcut.clone()),
+            reduce_motion: self.reduce_motion.unwrap_or(current.reduce_motion),
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]

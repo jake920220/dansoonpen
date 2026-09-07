@@ -6,7 +6,8 @@ Commands (Tauri invoke):
 - `get_state` -> AppState
 - `set_mode { mode }` -> AppState
 - `select_display { displayId }` -> AppState
-- `update_settings { settings }` -> AppState; persist settings and re-register shortcuts transactionally
+- `update_settings { settings }` -> AppState; merge only supplied fields into current native settings, validate/persist and re-register shortcuts transactionally. Palette and shortcut edits in separate windows do not replace unrelated fields.
+- `capture_shortcut { active }` -> void; control window only. Suspend the app's global shortcuts while its focused recorder captures a key combination. Restore on exit, native focus loss or control close.
 - `get_scene { displayId }` -> SceneSnapshot
 - `apply_edit { edit: SceneEdit }` -> SceneSnapshot; add/remove as one undoable edit
 - `clear_all` -> void; remove existing annotations from all displays in one undoable action
@@ -16,6 +17,7 @@ Commands (Tauri invoke):
 
 Events:
 - `brush-state`: AppState, emitted after native state transitions/settings/displays changes
+- `brush-open-settings`: void, targeted at control to open the settings tab from the tray, overlay or native Cmd+, menu item
 - `brush-scene`: SceneUpdate; broadcast, frontend filters displayId. Clear emits removed objects as fadeOut and empty current scene. Undo emits restored scene with zero fade. Late fade must never erase new objects.
 
 Windows:

@@ -12,8 +12,20 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
     if file.metadata().map_err(|e| e.to_string())?.len() > 64 * 1024 {
         return Err("설정 파일이 너무 큽니다.".into());
     }
-    let settings: AppSettings =
+    let mut settings: AppSettings =
         serde_json::from_reader(file).map_err(|e| format!("설정 파일을 읽지 못했습니다: {e}"))?;
+    if settings.version == 1 {
+        // Upgrade the previous defaults, retaining individually customized settings.
+        if settings.width == 5. {
+            settings.width = 12.;
+        }
+        if settings.toggle_shortcut == "Alt+Shift+D" && settings.clear_shortcut == "Alt+Shift+X" {
+            let defaults = AppSettings::default();
+            settings.toggle_shortcut = defaults.toggle_shortcut;
+            settings.clear_shortcut = defaults.clear_shortcut;
+        }
+        settings.version = 2;
+    }
     settings.validate()?;
     Ok(settings)
 }
@@ -59,6 +71,53 @@ pub fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn old_defaults_upgrade_without_discarding_custom_colors_or_keys() {
+        let path =
+            std::env::temp_dir().join(format!("my-brush-migration-{}.json", std::process::id()));
+        let mut settings = AppSettings {
+            version: 1,
+            width: 5.,
+            toggle_shortcut: "Alt+Shift+D".into(),
+            clear_shortcut: "Alt+Shift+X".into(),
+            ..AppSettings::default()
+        };
+        std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
+        assert_eq!(load(&path).unwrap(), AppSettings::default());
+        settings.width = 19.;
+        settings.color = "#123456".into();
+        settings.toggle_shortcut = "Command+Shift+D".into();
+        std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
+        let loaded = load(&path).unwrap();
+        assert_eq!(loaded.version, 2);
+        assert_eq!(loaded.width, 19.);
+        assert_eq!(loaded.color, "#123456");
+        assert_eq!(loaded.toggle_shortcut, settings.toggle_shortcut);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn independent_window_patches_preserve_the_latest_fields() {
+        use crate::model::SettingsPatch;
+        let first = SettingsPatch {
+            color: Some("#57d9c6".into()),
+            ..Default::default()
+        }
+        .apply(&AppSettings::default());
+        let second = SettingsPatch {
+            toggle_shortcut: Some("Control+Shift+D".into()),
+            ..Default::default()
+        }
+        .apply(&first);
+        let latest = SettingsPatch {
+            width: Some(20.),
+            ..Default::default()
+        }
+        .apply(&second);
+        assert_eq!(latest.color, "#57d9c6");
+        assert_eq!(latest.toggle_shortcut, "Control+Shift+D");
+        assert_eq!(latest.width, 20.);
+        latest.validate().unwrap();
+    }
     #[test]
     fn persistence_round_trip_and_corrupt_rejection() {
         let path =

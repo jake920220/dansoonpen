@@ -24,7 +24,8 @@ export interface SceneSnapshot { displayId: string; revision: number; clearGener
 export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fadeDurationMs: number }
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
-  version: 1, color: '#ffcf56', width: 5, textSize: 28,
+  version: 2, color: '#ffcf56', width: 12, textSize: 28,
   quickColors: ['#ffcf56', '#ff6b6b', '#57d9c6', '#78a9ff', '#c4a0ff', '#ffffff'],
-  toggleShortcut: 'Alt+Shift+D', clearShortcut: 'Alt+Shift+X', reduceMotion: false,
+  toggleShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+Z' : 'Alt+Shift+Z',
+  clearShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+X' : 'Alt+Shift+X', reduceMotion: false,
 };

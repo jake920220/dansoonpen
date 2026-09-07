@@ -1,0 +1,46 @@
+import type { AppSettings, AppState } from '../shared/types';
+
+type Patch = Partial<AppSettings>;
+/** Coalesce sliders and retain only the latest unsaved value for each field. */
+export class SettingsWriter {
+  private pending: Patch = {};
+  private optimistic: Patch = {};
+  private versions = new Map<keyof AppSettings, number>();
+  private sequence = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private edits: Promise<void> = Promise.resolve();
+  constructor(
+    private save: (patch: Patch) => Promise<AppState>,
+    private accept: (state: AppState) => void,
+    private changed: (pending: Patch) => void,
+    private failed: (error: unknown) => void,
+  ) {}
+  update(patch: Patch) {
+    for (const key of Object.keys(patch) as (keyof AppSettings)[]) this.versions.set(key, ++this.sequence);
+    this.pending = { ...this.pending, ...patch };
+    this.optimistic = { ...this.optimistic, ...patch };
+    this.changed(this.optimistic);
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { void this.flush(); }, 100);
+  }
+  flush(): Promise<void> {
+    clearTimeout(this.timer);
+    const patch = this.pending;
+    if (!Object.keys(patch).length) return this.edits;
+    this.pending = {};
+    const versions = new Map(this.versions);
+    this.edits = this.edits.then(async () => {
+      try { this.accept(await this.save(patch)); }
+      catch (error) { this.failed(error); }
+      finally {
+        const remaining = { ...this.optimistic };
+        for (const key of Object.keys(patch) as (keyof AppSettings)[]) {
+          if (versions.get(key) === this.versions.get(key)) delete remaining[key];
+        }
+        this.optimistic = remaining;
+        this.changed(remaining);
+      }
+    });
+    return this.edits;
+  }
+}

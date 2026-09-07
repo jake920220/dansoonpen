@@ -21,7 +21,8 @@ export const bridge = {
   getState: () => call<AppState>('get_state'),
   setMode: (mode: Mode) => call<AppState>('set_mode', { mode }),
   selectDisplay: (displayId: string) => call<AppState>('select_display', { displayId }),
-  updateSettings: (settings: AppSettings) => call<AppState>('update_settings', { settings }),
+  updateSettings: (settings: Partial<AppSettings>) => call<AppState>('update_settings', { settings }),
+  captureShortcut: (active: boolean) => call<void>('capture_shortcut', { active }),
   getScene: (displayId: string) => call<SceneSnapshot>('get_scene', { displayId }),
   applyEdit: (edit: SceneEdit) => call<SceneSnapshot>('apply_edit', { edit }),
   clearAll: () => call<void>('clear_all'),
@@ -30,11 +31,12 @@ export const bridge = {
   showControl: () => call<void>('show_control'),
   quit: () => call<void>('quit_app'),
   onState: (handler: (state: AppState) => void) => subscribe('brush-state', handler),
+  onOpenSettings: (handler: () => void) => subscribe('brush-open-settings', handler),
   onScene: (handler: (update: SceneUpdate) => void) => subscribe('brush-scene', handler),
 };
 
 export function message(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 export function shortcutLabel(shortcut: string): string {
   const mac = /Mac/.test(navigator.platform);
-  return shortcut.split('+').map((key) => ({ Alt: mac ? '⌥' : 'Alt', Shift: mac ? '⇧' : 'Shift', Control: mac ? '⌃' : 'Ctrl', Super: mac ? '⌘' : 'Win', Command: '⌘' }[key] ?? key)).join(mac ? ' ' : ' + ');
+  return shortcut.split('+').map((key) => ({ Alt: mac ? '⌥' : 'Alt', Shift: mac ? '⇧' : 'Shift', Control: mac ? '⌃' : 'Ctrl', Super: mac ? '⌘' : 'Win', Command: '⌘', Comma: ',', Period: '.', Slash: '/', Backslash: '\\', BracketLeft: '[', BracketRight: ']', Backquote: '`', Semicolon: ';', Quote: "'", Minus: '-', Equal: '=', Space: 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[key] ?? key)).join(mac ? ' ' : ' + ');
 }

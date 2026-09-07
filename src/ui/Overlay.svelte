@@ -5,6 +5,9 @@
   import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
   import { DEFAULT_SETTINGS, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
+  import ColorPalette from './ColorPalette.svelte';
+  import { SettingsWriter } from '../app/settings-writer';
+  import { isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
 
   let { displayId }: { displayId: string } = $props();
   let canvas: HTMLCanvasElement;
@@ -30,10 +33,7 @@
   const pendingRemovals = new Set<string>();
   let edits: Promise<unknown> = Promise.resolve();
   let disposed = false;
-  let settingsTimer: ReturnType<typeof setTimeout> | undefined;
-  let pendingSettings: Partial<AppSettings> = {};
   let optimisticSettings = $state<Partial<AppSettings>>({});
-  let settingsEdits: Promise<unknown> = Promise.resolve();
   let textCommit: Promise<void> | null = null;
   let drawing = $derived(appState?.mode === 'draw' && appState?.activeDisplayId === displayId);
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
@@ -90,7 +90,7 @@
         if (!disposed) { acceptState(initialState); acceptScene(initialScene); }
       } catch (e) { if (!disposed) error = message(e); }
     })();
-    return () => { disposed = true; unlisteners.forEach((off) => off()); clearTimeout(settingsTimer); renderer?.dispose(); };
+    return () => { disposed = true; unlisteners.forEach((off) => off()); void settingsWriter.flush(); renderer?.dispose(); };
   });
   function submit(added: Annotation[], removedIds: string[]) {
     if (!added.length && !removedIds.length) return;
@@ -199,31 +199,18 @@
   async function action(fn: () => Promise<unknown>) {
     finishPointer(); await commitText(); showPalette = false; error = '';
     await edits;
+    await settingsWriter.flush();
     try { await fn(); } catch (e) { error = message(e); }
   }
-  function updateSetting(patch: Partial<AppSettings>) {
-    clearTimeout(settingsTimer);
-    pendingSettings = { ...pendingSettings, ...patch };
-    optimisticSettings = { ...optimisticSettings, ...patch };
-    settingsTimer = setTimeout(() => {
-      const changes = pendingSettings; pendingSettings = {};
-      settingsEdits = settingsEdits.then(async () => {
-        try { acceptState(await bridge.updateSettings({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...changes })); }
-        catch (e) { if (!disposed) error = message(e); }
-        finally {
-          const remaining = { ...optimisticSettings };
-          for (const key of Object.keys(changes) as (keyof AppSettings)[]) {
-            if (remaining[key] === changes[key] && !(key in pendingSettings)) delete remaining[key];
-          }
-          optimisticSettings = remaining;
-          localWidth = remaining.width ?? appState?.settings.width ?? DEFAULT_SETTINGS.width;
-          localTextSize = remaining.textSize ?? appState?.settings.textSize ?? DEFAULT_SETTINGS.textSize;
-        }
-      });
-    }, 100);
-  }
+  const settingsWriter = new SettingsWriter(bridge.updateSettings, acceptState, (pending) => {
+    optimisticSettings = pending;
+    localWidth = pending.width ?? appState?.settings.width ?? DEFAULT_SETTINGS.width;
+    localTextSize = pending.textSize ?? appState?.settings.textSize ?? DEFAULT_SETTINGS.textSize;
+  }, (e) => { if (!disposed) error = message(e); });
+  function updateSetting(patch: Partial<AppSettings>) { settingsWriter.update(patch); }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
+    if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
     const target = event.target as HTMLElement;
     const editingInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
     if (event.isComposing || composing || event.keyCode === 229) return;
@@ -238,11 +225,8 @@
     if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
       event.preventDefault(); void action(event.shiftKey ? bridge.redo : bridge.undo); return;
     }
-    if (!native && event.altKey && event.shiftKey) {
-      if (event.code === 'KeyX') { event.preventDefault(); void bridge.clearAll().catch((e) => error = message(e)); }
-      else if (event.code === 'KeyD') { event.preventDefault(); void action(() => bridge.setMode('interact')); }
-      return;
-    }
+    if (!native && matchesShortcut(event, settings.clearShortcut)) { event.preventDefault(); void action(bridge.clearAll); return; }
+    if (!native && matchesShortcut(event, settings.toggleShortcut)) { event.preventDefault(); void action(() => bridge.setMode('interact')); return; }
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
     const key = event.key.toLowerCase();
     if (key === 'p' || key === 'e' || key === 't') { event.preventDefault(); chooseTool(key === 'p' ? 'pen' : key === 'e' ? 'eraser' : 'text'); }
@@ -281,13 +265,13 @@
       </div>
       <span class="toolbar-divider"></span>
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
-      <button aria-label="설정 열기" title="설정 열기" onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
+      <button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     </div>
     {#if showPalette}
       <div class="palette-panel">
         <div class="palette-heading"><span>펜 색상</span><code>{settings.color.toUpperCase()}</code></div>
-        <div class="palette-swatches">{#each settings.quickColors as color, i}<button class:selected={settings.color === color} aria-label={`색상 ${i + 1}`} aria-pressed={settings.color === color} title={`색상 ${i + 1}`} style:background={color} onclick={() => updateSetting({ color })}>{#if settings.color === color}<Icon name="check" size={16} />{/if}</button>{/each}<label class="custom-color" title="다른 색상 선택"><span>+</span><input type="color" aria-label="다른 색상 선택" value={settings.color} onchange={(e) => updateSetting({ color: e.currentTarget.value })} /></label></div>
+        <ColorPalette value={settings.color} colors={settings.quickColors} onchange={(color) => updateSetting({ color })} onpalettechange={(quickColors) => updateSetting({ quickColors })} />
         <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateSetting({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateSetting({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
         <p>숫자 1–6으로 색상 · [ ]로 굵기 조절</p>
       </div>
