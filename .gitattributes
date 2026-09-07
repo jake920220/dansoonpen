@@ -1,0 +1,2 @@
+# Preserve upstream legal text, including intentional/trailing source whitespace.
+THIRD_PARTY_NOTICES.txt text eol=lf whitespace=-blank-at-eol
