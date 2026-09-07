@@ -22,6 +22,17 @@ struct RuntimeState {
     pressed: HashSet<u32>,
 }
 struct Session(Mutex<RuntimeState>);
+struct TrayShortcuts {
+    draw: MenuItem<tauri::Wry>,
+    clear: MenuItem<tauri::Wry>,
+}
+impl TrayShortcuts {
+    fn update(&self, settings: &AppSettings) -> tauri::Result<()> {
+        // Native accelerators supply the right-aligned, platform-specific labels.
+        self.draw.set_accelerator(Some(&settings.toggle_shortcut))?;
+        self.clear.set_accelerator(Some(&settings.clear_shortcut))
+    }
+}
 // Windows WebView2 creation must run outside synchronous webview/menu callbacks.
 // AppKit operations, in contrast, must run on the macOS main thread.
 fn dispatch_native<F: FnOnce() + Send + 'static>(
@@ -395,7 +406,11 @@ async fn update_settings(
             return Err(error);
         }
         d.app.settings = settings;
-        d.app.error = None;
+        d.app.error = app
+            .state::<TrayShortcuts>()
+            .update(&d.app.settings)
+            .err()
+            .map(|e| format!("설정은 저장했지만 메뉴 단축키 표시를 갱신하지 못했습니다: {e}"));
         emit_state(&app, &mut d);
         Ok(d.app.clone())
     })
@@ -510,18 +525,26 @@ async fn quit_app(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), St
     })
     .await
 }
-fn tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
     let control = MenuItem::with_id(app, "control", "설정 열기", true, None::<&str>)?;
-    let draw = MenuItem::with_id(app, "draw", "그리기", true, None::<&str>)?;
+    let draw = MenuItem::with_id(app, "draw", "그리기", true, Some(&settings.toggle_shortcut))?;
     let interact = MenuItem::with_id(
         app,
         "interact",
         "앱 조작으로 복귀 (입력 복구)",
         true,
-        None::<&str>,
+        Some("Escape"),
     )?;
-    let clear = MenuItem::with_id(app, "clear", "모든 화면 필기 지우기", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "My Brush 종료", true, None::<&str>)?;
+    let clear = MenuItem::with_id(
+        app,
+        "clear",
+        "모든 화면 필기 지우기",
+        true,
+        Some(&settings.clear_shortcut),
+    )?;
+    // Cmd+Q is already provided by the standard macOS application menu.
+    let quit_shortcut = cfg!(target_os = "macos").then_some("Command+Q");
+    let quit = MenuItem::with_id(app, "quit", "My Brush 종료", true, quit_shortcut)?;
     let menu = Menu::with_items(app, &[&control, &draw, &interact, &clear, &quit])?;
     TrayIconBuilder::with_id("brush")
         .tooltip("My Brush — 화면 필기")
@@ -562,6 +585,7 @@ fn tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             });
         })
         .build(app)?;
+    app.manage(TrayShortcuts { draw, clear });
     Ok(())
 }
 fn tray_pixels() -> Vec<u8> {
@@ -641,7 +665,7 @@ pub fn run() {
                     mode: Mode::Interact,
                     active_display_id: None,
                     displays: vec![],
-                    settings: loaded,
+                    settings: loaded.clone(),
                     revision: 0,
                     error,
                 },
@@ -669,7 +693,7 @@ pub fn run() {
             .inner_size(940., 760.)
             .min_inner_size(680., 540.)
             .build()?;
-            tray(app.handle())?;
+            tray(app.handle(), &loaded)?;
             {
                 let state = app.state::<Session>();
                 let mut d = state.0.lock().map_err(|e| e.to_string())?;

@@ -59,6 +59,8 @@ macOS 결과는 `src-tauri/target/release/bundle/macos/My Brush.app`, 로컬 서
 
 앱을 열고 그릴 화면을 선택한 뒤 **그리기 시작**을 누르세요. macOS 메뉴 막대 또는 Windows 트레이의 펜 아이콘에서도 설정과 복구 메뉴를 열 수 있습니다.
 
+트레이 메뉴 오른쪽에는 OS 형식에 맞는 단축키가 표시됩니다. 그리기·전체 지우기는 저장한 단축키를 따르며 설정을 바꾸면 즉시 갱신됩니다. 앱 조작 복귀는 Esc, macOS 종료는 ⌘Q로 표시합니다.
+
 | 동작 | macOS | Windows |
 | --- | --- | --- |
 | 그리기 ↔ 앱 조작 | Option+Shift+D | Alt+Shift+D |
