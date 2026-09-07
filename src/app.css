@@ -1,0 +1,27 @@
+@import url('./ui/control.css');
+@import url('./ui/overlay.css');
+
+:root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; color: #edf0f5; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; font-size: 14px; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; width: 100%; height: 100%; background: transparent; }
+body { overflow: hidden; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; color: inherit; }
+button:disabled { cursor: default; opacity: .45; }
+button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #ffcf56; outline-offset: 3px; }
+button svg { flex-shrink: 0; }
+button { transition: background .12s, border-color .12s; }
+input[type='range'] { accent-color: #ffcf56; cursor: pointer; }
+input[type='color'] { appearance: none; -webkit-appearance: none; padding: 0; border: 0; background: transparent; cursor: pointer; }
+input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
+input[type='color']::-webkit-color-swatch { border: 0; border-radius: 50%; }
+kbd { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #404450; border-radius: 5px; padding: 3px 7px; color: #d2d5de; background: #242730; font: 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; white-space: nowrap; }
+.primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 19px; border: 1px solid #ffcf56; border-radius: 10px; background: #ffcf56; color: #231e13; font-weight: 650; }
+.primary:hover { background: #ffdc80; }
+.secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border: 1px solid #414550; border-radius: 10px; background: #242730; }
+.secondary:hover { background: #30343e; }
+.error-box { border: 1px solid #965044; background: #382726; color: #ffd8cf; padding: 12px 15px; border-radius: 9px; line-height: 1.6; font-size: 13px; overflow-wrap: anywhere; }
+.success { color: #85dbc2; font-size: 12px; }
+.muted { color: #9a9fad; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }

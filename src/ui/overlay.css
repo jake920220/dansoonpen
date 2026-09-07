@@ -1,0 +1,55 @@
+.drawing-surface { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; touch-action: none; }
+.drawing-surface.enabled { pointer-events: auto; cursor: crosshair; }
+.drawing-surface.text-tool { cursor: text; }
+.drawing-surface.erase-tool { cursor: none; }
+.draw-frame { position: fixed; inset: 0; border: 1px solid #ffcf5680; pointer-events: none; }
+.eraser-cursor { position: fixed; display: none; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #0009; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; background: #ffffff10; }
+.toolbar-area { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10; user-select: none; }
+.toolbar { display: flex; align-items: center; gap: 5px; padding: 7px 9px; background: #20232bfa; border: 1px solid #4c505d; border-radius: 14px; box-shadow: 0 7px 24px #0004; color: #c4cbd7; white-space: nowrap; }
+.toolbar-brand { color: #ffcf56; display: flex; padding: 5px 7px 5px 3px; }
+.toolbar button { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 7px; height: 35px; min-width: 34px; padding: 6px; }
+.toolbar button:hover { background: #343944; }
+.toolbar button.chosen { background: #ffcf56; color: #282416; border-color: #ffcf56; }
+.tool-group { display: flex; gap: 3px; }
+.toolbar-divider { width: 1px; height: 23px; background: #464a56; margin: 0 3px; }
+.toolbar button.color-trigger { gap: 8px; padding: 6px 8px; }
+.color-trigger > span:first-child { width: 19px; height: 19px; border-radius: 50%; box-shadow: 0 0 0 1px #ffffff35; }
+.width-dot { background: #dce0e8; border-radius: 50%; }
+.toolbar .interact-button { gap: 6px; padding: 6px 8px; font-size: 11px; color: #c4cddc; }
+.interact-button kbd { font-size: 9px; padding: 1px 4px; margin-left: 2px; }
+.overlay-display-select { background: #2e3440; border: 1px solid #414958; border-radius: 6px; padding: 6px; max-width: 140px; color: #cbd3e2; font-size: 10px; }
+.palette-panel { width: 283px; margin: 9px auto 0; padding: 17px; border: 1px solid #4a505e; border-radius: 12px; box-shadow: 0 8px 24px #0004; background: #242831; }
+.palette-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 11px; color: #d3d9e3; }
+.palette-heading code { color: #99a4b7; font-size: 10px; }
+.palette-swatches { display: flex; align-items: center; gap: 10px; }
+.palette-swatches button { width: 26px; height: 26px; border: 2px solid transparent; border-radius: 50%; padding: 0; color: #252932; display: flex; align-items: center; justify-content: center; }
+.palette-swatches button.selected { outline: 1px solid #e5ebf7; outline-offset: 3px; }
+.custom-color { width: 26px; height: 26px; border: 1px dashed #778194; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; color: #bbc5d7; }
+.custom-color input { position: absolute; opacity: 0; width: 100%; height: 100%; inset: 0; }
+.palette-range { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 11px; color: #bbc5d6; }
+.palette-range input { min-width: 0; flex: 1; height: 3px; }
+.palette-range output { width: 31px; font-size: 10px; text-align: right; color: #e6c778; }
+.palette-panel p { color: #8592a8; font-size: 9px; margin: 17px 0 0; text-align: center; }
+.mode-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; background: #242831eb; color: #bec7d8; border: 1px solid #525b6b; border-radius: 30px; padding: 9px 14px; font-size: 10px; pointer-events: none; white-space: nowrap; }
+.hint-dot { width: 5px; height: 5px; background: #ffcf56; border-radius: 50%; }
+.mode-hint strong { color: #ffcf56; font-size: 10px; font-weight: 550; }
+.hint-separator { width: 1px; height: 11px; background: #535c6d; }
+.hint-count { color: #8998ad; padding-left: 4px; font-size: 9px; }
+.text-editor { position: fixed; z-index: 12; max-width: calc(100vw - 20px); }
+.text-editor textarea { display: block; width: min(440px, calc(100vw - 30px)); min-height: 55px; max-height: 60vh; resize: both; border: 1px dashed #ffcf56; border-radius: 4px 4px 0 0; padding: 0; margin: 0; background: #20252b99; outline: none; overflow: auto; }
+.text-editor textarea::placeholder { color: #ffffff90; }
+.text-editor-actions { display: flex; gap: 8px; align-items: center; padding: 6px 7px; background: #232831; color: #a8b5c9; border: 1px solid #535d6c; border-top: 0; border-radius: 0 0 7px 7px; }
+.text-editor-actions > span { margin-right: auto; font-size: 9px; }
+.text-editor-actions button { display: flex; align-items: center; gap: 3px; background: transparent; border: 0; color: #b0bdd1; border-radius: 4px; padding: 4px; font-size: 10px; }
+.text-editor-actions .text-confirm { background: #ffcf56; color: #292517; padding: 4px 6px; }
+.overlay-error { position: fixed; z-index: 30; left: 20px; bottom: 66px; max-width: min(700px, calc(100vw - 40px)); display: flex; align-items: center; gap: 10px; }
+.overlay-error button { flex-shrink: 0; background: transparent; color: #ffd6ca; border: 1px solid #946c60; padding: 6px; border-radius: 5px; font-size: 11px; }
+.preview-desktop { position: fixed; inset: 0; background: #eeeae2; color: #4b4c4e; padding: 18vh 13vw; pointer-events: none; }
+.preview-desktop > span { color: #92938f; letter-spacing: 2px; font-size: 11px; }
+.preview-desktop h1 { margin: 28px 0 18px; font-size: clamp(25px, 4vw, 48px); font-weight: 550; letter-spacing: -1px; color: #363c3e; }
+.preview-desktop p { color: #7b8282; font-size: 14px; }
+.preview-note { margin-top: 65px; font-size: 23px; line-height: 1.8; font-weight: 400; color: #657073; }
+.preview-note strong { font-weight: 450; }
+.preview-resume { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 13px; align-items: center; background: #222936; border-radius: 12px; padding: 9px; }
+.preview-resume span { color: #b9c4d8; font-size: 11px; padding-right: 7px; }
+@media (max-width: 700px) { .toolbar { gap: 2px; padding: 6px; } .toolbar button { min-width: 29px; width: 29px; } .toolbar-brand, .interact-button span, .interact-button kbd { display: none; } .toolbar-divider { margin: 0 2px; } .overlay-display-select { max-width: 85px; } .mode-hint { font-size: 9px; gap: 7px; } }

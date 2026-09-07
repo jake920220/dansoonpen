@@ -1,0 +1,307 @@
+<script lang="ts">
+  import { onMount, tick } from 'svelte';
+  import { bridge, message, native, shortcutLabel } from '../app/bridge';
+  import { CanvasRenderer } from '../canvas/renderer';
+  import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
+  import { DEFAULT_SETTINGS, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
+  import Icon from './Icon.svelte';
+
+  let { displayId }: { displayId: string } = $props();
+  let canvas: HTMLCanvasElement;
+  let eraserCursor: HTMLDivElement;
+  let textarea = $state<HTMLTextAreaElement>();
+  let renderer: CanvasRenderer | undefined;
+  let appState = $state.raw<AppState | null>(null);
+  let error = $state('');
+  let tool = $state<Tool>('pen');
+  let showPalette = $state(false);
+  let localWidth = $state(DEFAULT_SETTINGS.width);
+  let localTextSize = $state(DEFAULT_SETTINGS.textSize);
+  let annotationCount = $state(0);
+  let textEntry = $state<{ x: number; y: number; value: string; color: string; fontSize: number } | null>(null);
+  let composing = false;
+  let compositionEndedAt = 0;
+  let scene: SceneSnapshot = { displayId: '', revision: -1, clearGeneration: 0, annotations: [] };
+  let currentStroke: StrokeAnnotation | null = null;
+  let activePointer: number | null = null;
+  let lastPoint: Point | null = null;
+  let erased = new Set<string>();
+  const pendingAdds = new Map<string, Annotation>();
+  const pendingRemovals = new Set<string>();
+  let edits: Promise<unknown> = Promise.resolve();
+  let disposed = false;
+  let settingsTimer: ReturnType<typeof setTimeout> | undefined;
+  let pendingSettings: Partial<AppSettings> = {};
+  let optimisticSettings = $state<Partial<AppSettings>>({});
+  let settingsEdits: Promise<unknown> = Promise.resolve();
+  let textCommit: Promise<void> | null = null;
+  let drawing = $derived(appState?.mode === 'draw' && appState?.activeDisplayId === displayId);
+  let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
+  let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
+
+  function visibleAnnotations(): Annotation[] {
+    const ids = new Set(scene.annotations.map((a) => a.id));
+    return [...scene.annotations.filter((a) => !erased.has(a.id) && !pendingRemovals.has(a.id)), ...[...pendingAdds.values()].filter((a) => !ids.has(a.id) && !erased.has(a.id) && !pendingRemovals.has(a.id))];
+  }
+  function renderScene() { const annotations = visibleAnnotations(); renderer?.setScene(annotations); annotationCount = annotations.length; }
+  function acceptScene(next: SceneSnapshot, removed: Annotation[] = [], duration?: number) {
+    if (next.displayId !== displayId || next.revision < scene.revision) return;
+    if (next.clearGeneration > scene.clearGeneration && scene.revision >= 0) {
+      const visible = visibleAnnotations();
+      if (currentStroke) visible.push(currentStroke);
+      if (textEntry?.value.trim()) visible.push({ kind: 'text', id: crypto.randomUUID(), x: textEntry.x, y: textEntry.y, text: textarea?.value ?? textEntry.value, color: textEntry.color, fontSize: textEntry.fontSize });
+      const ids = new Set(removed.map((a) => a.id));
+      removed = [...removed, ...visible.filter((a) => !ids.has(a.id))];
+      const pointer = activePointer; activePointer = null;
+      if (pointer !== null && canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+      currentStroke = null; lastPoint = null; erased.clear();
+      pendingAdds.clear(); pendingRemovals.clear();
+      textEntry = null; composing = false;
+      renderer?.setPreview(null);
+      duration ??= settings.reduceMotion ? 0 : 350;
+    }
+    scene = next;
+    renderScene();
+    if (removed.length) renderer?.fadeOut(removed, duration ?? 0);
+  }
+  function acceptUpdate(update: SceneUpdate) {
+    if (update.scene.displayId !== displayId || update.scene.revision <= scene.revision) return;
+    acceptScene(update.scene, update.fadeOut, update.fadeDurationMs);
+  }
+  function acceptState(next: AppState) {
+    if (appState && next.revision < appState.revision) return;
+    const leaving = drawing && (next.mode !== 'draw' || next.activeDisplayId !== displayId);
+    if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
+    appState = next;
+    localWidth = optimisticSettings.width ?? next.settings.width;
+    localTextSize = optimisticSettings.textSize ?? next.settings.textSize;
+  }
+  function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); }
+  onMount(() => {
+    const unlisteners: (() => void)[] = [];
+    try { renderer = new CanvasRenderer(canvas); resize(); } catch (e) { error = message(e); }
+    void (async () => {
+      try {
+        for (const promise of [bridge.onState(acceptState), bridge.onScene(acceptUpdate)]) {
+          const off = await promise;
+          if (disposed) off(); else unlisteners.push(off);
+        }
+        const [initialState, initialScene] = await Promise.all([bridge.getState(), bridge.getScene(displayId)]);
+        if (!disposed) { acceptState(initialState); acceptScene(initialScene); }
+      } catch (e) { if (!disposed) error = message(e); }
+    })();
+    return () => { disposed = true; unlisteners.forEach((off) => off()); clearTimeout(settingsTimer); renderer?.dispose(); };
+  });
+  function submit(added: Annotation[], removedIds: string[]) {
+    if (!added.length && !removedIds.length) return;
+    const clearGeneration = scene.clearGeneration;
+    added.forEach((a) => pendingAdds.set(a.id, a));
+    removedIds.forEach((id) => pendingRemovals.add(id));
+    renderScene();
+    edits = edits.then(async () => {
+      try {
+        const next = await bridge.applyEdit({ displayId, clearGeneration, added, removedIds });
+        added.forEach((a) => pendingAdds.delete(a.id));
+        removedIds.forEach((id) => pendingRemovals.delete(id));
+        if (!disposed) { acceptScene(next); renderScene(); }
+      } catch (e) {
+        added.forEach((a) => pendingAdds.delete(a.id));
+        removedIds.forEach((id) => pendingRemovals.delete(id));
+        if (!disposed) { error = `그림을 반영하지 못했습니다: ${message(e)}`; renderScene(); }
+      }
+    });
+  }
+  function point(event: PointerEvent): Point { return { x: event.clientX, y: event.clientY }; }
+  function updateEraser(event: PointerEvent) {
+    if (!eraserCursor) return;
+    eraserCursor.style.left = `${event.clientX}px`; eraserCursor.style.top = `${event.clientY}px`;
+    eraserCursor.style.display = drawing && tool === 'eraser' ? 'block' : 'none';
+  }
+  function hideEraser() { if (eraserCursor) eraserCursor.style.display = 'none'; }
+  function erase(from: Point, to: Point) {
+    for (const id of hitTestAnnotationsAlongSegment(visibleAnnotations(), from, to, Math.max(10, localWidth * 2))) erased.add(id);
+    renderScene();
+  }
+  function down(event: PointerEvent) {
+    if (!drawing || scene.revision < 0 || event.button !== 0 || activePointer !== null) return;
+    error = ''; showPalette = false;
+    if (textEntry) { commitText(); return; }
+    const start = point(event);
+    if (tool === 'text') {
+      textEntry = { ...start, x: Math.max(10, Math.min(start.x, innerWidth - 450)), y: Math.max(80, Math.min(start.y, innerHeight - 160)), value: '', color: settings.color, fontSize: localTextSize };
+      void tick().then(() => textarea?.focus());
+      return;
+    }
+    activePointer = event.pointerId; lastPoint = start;
+    canvas.setPointerCapture(event.pointerId);
+    if (tool === 'pen') {
+      currentStroke = { kind: 'stroke', id: crypto.randomUUID(), points: [start], color: settings.color, width: localWidth };
+      renderer?.setPreview(currentStroke);
+    } else { erased = new Set(); erase(start, start); }
+    event.preventDefault();
+  }
+  function move(event: PointerEvent) {
+    updateEraser(event);
+    if (!drawing || event.pointerId !== activePointer) return;
+    const samples = event.getCoalescedEvents?.() ?? [event];
+    const actual = samples.length ? samples : [event];
+    if (currentStroke) {
+      for (const sample of actual) {
+        if (currentStroke.points.length >= 100_000) break;
+        appendStrokePoint(currentStroke.points, point(sample));
+      }
+      renderer?.setPreview(currentStroke);
+      if (currentStroke.points.length >= 100_000) { finishPointer(); error = '긴 획을 저장했습니다. 마우스를 놓고 이어서 그려 주세요.'; }
+    } else if (lastPoint) {
+      for (const sample of actual) { const next = point(sample); erase(lastPoint, next); lastPoint = next; }
+    }
+    event.preventDefault();
+  }
+  function up(event: PointerEvent) {
+    if (event.pointerId !== activePointer) return;
+    if (currentStroke && currentStroke.points.length < 100_000) appendStrokePoint(currentStroke.points, point(event), 0, true);
+    else if (lastPoint) erase(lastPoint, point(event));
+    finishPointer();
+  }
+  function finishPointer() {
+    if (activePointer === null) return;
+    const pointer = activePointer; activePointer = null;
+    if (canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+    if (currentStroke) {
+      const stroke = currentStroke; currentStroke = null;
+      submit([stroke], []); renderer?.setPreview(null);
+    } else if (erased.size) { const ids = [...erased]; erased.clear(); submit([], ids); }
+    lastPoint = null;
+  }
+  function cancelPointer(event: PointerEvent) { if (activePointer === event.pointerId) finishPointer(); }
+  function chooseTool(next: Tool) { finishPointer(); commitText(); tool = next; showPalette = false; if (eraserCursor) eraserCursor.style.display = 'none'; }
+  function commitText(): Promise<void> {
+    if (textCommit) return textCommit;
+    if (!textEntry) return Promise.resolve();
+    const entry = textEntry;
+    const editor = textarea;
+    const settling = composing;
+    editor?.blur();
+    textCommit = (async () => {
+      // Native mode changes can precede the final IME input event. Keep the editor
+      // alive for the blur/composition events and use its actual DOM value.
+      if (settling) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const value = editor?.value ?? entry.value;
+      if (textEntry !== entry || disposed) return;
+      if (new TextEncoder().encode(value).length > 40_000) { error = '텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요.'; editor?.focus(); return; }
+      textEntry = null; composing = false;
+      if (!value.trim()) return;
+      const annotation: TextAnnotation = { kind: 'text', id: crypto.randomUUID(), x: entry.x, y: entry.y, text: value, color: entry.color, fontSize: entry.fontSize };
+      submit([annotation], []);
+    })().finally(() => { textCommit = null; });
+    return textCommit;
+  }
+  async function action(fn: () => Promise<unknown>) {
+    finishPointer(); await commitText(); showPalette = false; error = '';
+    await edits;
+    try { await fn(); } catch (e) { error = message(e); }
+  }
+  function updateSetting(patch: Partial<AppSettings>) {
+    clearTimeout(settingsTimer);
+    pendingSettings = { ...pendingSettings, ...patch };
+    optimisticSettings = { ...optimisticSettings, ...patch };
+    settingsTimer = setTimeout(() => {
+      const changes = pendingSettings; pendingSettings = {};
+      settingsEdits = settingsEdits.then(async () => {
+        try { acceptState(await bridge.updateSettings({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...changes })); }
+        catch (e) { if (!disposed) error = message(e); }
+        finally {
+          const remaining = { ...optimisticSettings };
+          for (const key of Object.keys(changes) as (keyof AppSettings)[]) {
+            if (remaining[key] === changes[key] && !(key in pendingSettings)) delete remaining[key];
+          }
+          optimisticSettings = remaining;
+          localWidth = remaining.width ?? appState?.settings.width ?? DEFAULT_SETTINGS.width;
+          localTextSize = remaining.textSize ?? appState?.settings.textSize ?? DEFAULT_SETTINGS.textSize;
+        }
+      });
+    }, 100);
+  }
+  function keyboard(event: KeyboardEvent) {
+    if (!drawing) return;
+    const target = event.target as HTMLElement;
+    const editingInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
+    if (event.isComposing || composing || event.keyCode === 229) return;
+    if (event.key === 'Escape') {
+      if (performance.now() - compositionEndedAt < 50) return;
+      event.preventDefault();
+      if (textEntry) { textEntry = null; return; }
+      if (showPalette) { showPalette = false; return; }
+      void action(() => bridge.setMode('interact')); return;
+    }
+    if (editingInput) return;
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault(); void action(event.shiftKey ? bridge.redo : bridge.undo); return;
+    }
+    if (!native && event.altKey && event.shiftKey) {
+      if (event.code === 'KeyX') { event.preventDefault(); void bridge.clearAll().catch((e) => error = message(e)); }
+      else if (event.code === 'KeyD') { event.preventDefault(); void action(() => bridge.setMode('interact')); }
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
+    const key = event.key.toLowerCase();
+    if (key === 'p' || key === 'e' || key === 't') { event.preventDefault(); chooseTool(key === 'p' ? 'pen' : key === 'e' ? 'eraser' : 'text'); }
+    else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateSetting({ color: settings.quickColors[Number(key) - 1] }); }
+    else if (key === '[' || key === ']') { event.preventDefault(); localWidth = Math.max(1, Math.min(32, localWidth + (key === ']' ? 1 : -1))); updateSetting({ width: localWidth }); }
+  }
+  function textKey(event: KeyboardEvent) {
+    if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
+    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); commitText(); canvas.focus(); }
+  }
+</script>
+
+<svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); hideEraser(); }} />
+{#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>이곳에 설명을 그려 보세요.</h1><p>브라우저에서는 그리기 도구만 미리 볼 수 있습니다.</p><div class="preview-note">화면 위의 표시를 유지한 채<br /><strong>다음 이야기로 넘어가세요.</strong></div></div>{/if}
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<canvas bind:this={canvas} class="drawing-surface" class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
+<div bind:this={eraserCursor} class="eraser-cursor" style:width={`${Math.max(10, localWidth * 2) * 2}px`} style:height={`${Math.max(10, localWidth * 2) * 2}px`}></div>
+
+{#if drawing}
+  <div class="draw-frame" aria-hidden="true"></div>
+  <div class="toolbar-area">
+    <div class="toolbar" role="toolbar" aria-label="그리기 도구">
+      <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
+      <div class="tool-group">
+        <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title="펜 (P)" aria-label="펜" onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
+        <button class:chosen={tool === 'eraser'} aria-pressed={tool === 'eraser'} title="지우개 (E) · 획 단위로 지우기" aria-label="지우개" onclick={() => chooseTool('eraser')}><Icon name="eraser" /></button>
+        <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
+      </div>
+      <span class="toolbar-divider"></span>
+      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={settings.color}></span><span class="width-dot" style:width={`${Math.min(14, localWidth + 2)}px`} style:height={`${Math.min(14, localWidth + 2)}px`}></span></button>
+      <span class="toolbar-divider"></span>
+      <div class="tool-group">
+        <button aria-label="실행 취소" title="실행 취소 (⌘/Ctrl+Z)" onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
+        <button aria-label="다시 실행" title="다시 실행 (⌘/Ctrl+Shift+Z)" onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>
+        <button aria-label="전체 지우기" title={`전체 지우기 (${shortcutLabel(settings.clearShortcut)})`} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
+      </div>
+      <span class="toolbar-divider"></span>
+      {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
+      <button aria-label="설정 열기" title="설정 열기" onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
+      <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
+    </div>
+    {#if showPalette}
+      <div class="palette-panel">
+        <div class="palette-heading"><span>펜 색상</span><code>{settings.color.toUpperCase()}</code></div>
+        <div class="palette-swatches">{#each settings.quickColors as color, i}<button class:selected={settings.color === color} aria-label={`색상 ${i + 1}`} aria-pressed={settings.color === color} title={`색상 ${i + 1}`} style:background={color} onclick={() => updateSetting({ color })}>{#if settings.color === color}<Icon name="check" size={16} />{/if}</button>{/each}<label class="custom-color" title="다른 색상 선택"><span>+</span><input type="color" aria-label="다른 색상 선택" value={settings.color} onchange={(e) => updateSetting({ color: e.currentTarget.value })} /></label></div>
+        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateSetting({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateSetting({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
+        <p>숫자 1–6으로 색상 · [ ]로 굵기 조절</p>
+      </div>
+    {/if}
+  </div>
+  <div class="mode-hint"><span class="hint-dot"></span><strong>{tool === 'text' ? '텍스트' : tool === 'eraser' ? '지우개' : '그리기'}</strong><span class="hint-separator"></span>{#if tool === 'text'}화면을 클릭해 입력하세요{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
+{:else if !native}
+  <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>다시 그리기</button><span>그림은 유지됩니다 · {currentDisplay?.name ?? '미리보기'}</span></div>
+{/if}
+
+{#if textEntry}
+  <div class="text-editor" style:left={`${textEntry.x}px`} style:top={`${textEntry.y}px`}>
+    <textarea bind:this={textarea} bind:value={textEntry.value} aria-label="화면에 입력할 텍스트" placeholder="텍스트 입력" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
+    <div class="text-editor-actions"><span>Enter 완료 · Shift+Enter 줄바꿈</span><button aria-label="텍스트 취소" onclick={() => textEntry = null}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label="텍스트 완료" onclick={commitText}><Icon name="check" size={16} />완료</button></div>
+  </div>
+{/if}
+{#if error}<div class="overlay-error error-box" role="alert"><span>{error}</span><button onclick={() => action(() => bridge.setMode('interact'))}>앱 조작으로 돌아가기</button><button aria-label="알림 닫기" onclick={() => error = ''}><Icon name="close" size={16} /></button></div>{/if}
