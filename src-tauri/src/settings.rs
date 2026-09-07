@@ -26,6 +26,9 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
         }
         settings.version = 2;
     }
+    if settings.version == 2 {
+        settings.version = 3;
+    }
     settings.validate()?;
     Ok(settings)
 }
@@ -89,7 +92,7 @@ mod tests {
         settings.toggle_shortcut = "Command+Shift+D".into();
         std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 2);
+        assert_eq!(loaded.version, 3);
         assert_eq!(loaded.width, 19.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.toggle_shortcut, settings.toggle_shortcut);
@@ -117,6 +120,68 @@ mod tests {
         assert_eq!(latest.toggle_shortcut, "Control+Shift+D");
         assert_eq!(latest.width, 20.);
         latest.validate().unwrap();
+    }
+    #[test]
+    fn v2_settings_gain_presets_without_changing_saved_defaults() {
+        let path = std::env::temp_dir().join(format!("my-brush-v2-{}.json", std::process::id()));
+        let mut json = serde_json::to_value(AppSettings::default()).unwrap();
+        json["version"] = 2.into();
+        json["width"] = 17.into();
+        json["color"] = "#123456".into();
+        json.as_object_mut().unwrap().remove("presets");
+        std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+        let loaded = load(&path).unwrap();
+        assert_eq!(loaded.version, 3);
+        assert_eq!(loaded.width, 17.);
+        assert_eq!(loaded.color, "#123456");
+        assert_eq!(loaded.presets.len(), 3);
+        save(&path, &loaded).unwrap();
+        assert_eq!(load(&path).unwrap(), loaded);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn current_brush_changes_never_change_defaults_and_explicit_default_edits_apply() {
+        use crate::model::{BrushPatch, BrushSettings, SettingsPatch, Tool};
+        let defaults = AppSettings::default();
+        let brush = BrushPatch {
+            color: Some("#123456".into()),
+            width: Some(4.),
+            tool: Some(Tool::Text),
+            ..Default::default()
+        }
+        .apply(&BrushSettings::from_defaults(&defaults));
+        assert_eq!(defaults.width, 12.);
+        assert_eq!(defaults.color, "#ffcf56");
+        let patch = SettingsPatch {
+            width: Some(18.),
+            ..Default::default()
+        };
+        let brush = patch.brush_patch().apply(&brush);
+        assert_eq!(brush.width, 18.);
+        assert_eq!(brush.color, "#123456");
+        assert_eq!(brush.tool, Tool::Text);
+        let persisted = patch.apply(&defaults);
+        assert_eq!(BrushSettings::from_defaults(&persisted).color, "#ffcf56");
+    }
+    #[test]
+    fn preset_edits_preserve_other_slots_defaults_and_reject_invalid_values() {
+        let settings = AppSettings::default();
+        let modified = settings
+            .replace_preset(
+                0,
+                Some("  강의용  ".into()),
+                Some(settings.presets[1].brush.clone()),
+            )
+            .unwrap();
+        assert_eq!(modified.presets[0].name, "강의용");
+        assert_eq!(modified.presets[0].brush.width, 4.);
+        assert_eq!(modified.presets[1..], settings.presets[1..]);
+        assert_eq!(modified.width, 12.);
+        assert!(settings.replace_preset(3, None, None).is_err());
+        assert!(settings.replace_preset(0, Some(" ".into()), None).is_err());
+        let mut invalid = settings.presets[0].brush.clone();
+        invalid.width = f64::NAN;
+        assert!(settings.replace_preset(0, None, Some(invalid)).is_err());
     }
     #[test]
     fn persistence_round_trip_and_corrupt_rejection() {

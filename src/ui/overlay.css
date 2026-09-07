@@ -52,3 +52,10 @@
 .preview-resume { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 13px; align-items: center; background: #222936; border-radius: 12px; padding: 9px; }
 .preview-resume span { color: #b9c4d8; font-size: 11px; padding-right: 7px; }
 @media (max-width: 700px) { .toolbar { gap: 2px; padding: 6px; } .toolbar button { min-width: 29px; width: 29px; } .toolbar-brand, .interact-button span, .interact-button kbd { display: none; } .toolbar-divider { margin: 0 2px; } .overlay-display-select { max-width: 85px; } .mode-hint { font-size: 9px; gap: 7px; } }
+
+.preset-shortcuts button { gap: 4px; font-size: 10px; }
+.preset-shortcuts button span { width: 7px; height: 7px; border-radius: 50%; }
+.brush-reset, .preset-save { display: flex; gap: 8px; align-items: center; margin-top: 16px; font-size: 10px; color: #9ba9bd; }
+.brush-reset button, .preset-save button, .preset-save select { background: #343c49; border: 1px solid #525e70; border-radius: 6px; padding: 7px; color: #d6deeb; font-size: 10px; }
+.brush-reset button { margin-left: auto; }
+.preset-save select { flex: 1; min-width: 0; }

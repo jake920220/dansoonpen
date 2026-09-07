@@ -114,16 +114,27 @@
       </section>
       <div class="sharing-note"><Icon name="monitor" size={17} /><p>화면공유는 <strong>모니터 전체</strong>로 선택해 주세요. 특정 앱 창만 공유하면 그림이 전달되지 않을 수 있습니다.</p></div>
     {:else if tab === 'settings'}
-      <div class="settings-heading"><h1>설정</h1><p>색상과 굵기는 바꾸는 즉시 저장되고 다음 필기에 적용됩니다.</p></div>
+      <div class="settings-heading"><h1>설정</h1><p>시작 기본값을 저장합니다. 바꾼 값은 현재 도구에도 바로 적용됩니다.</p></div>
       {#if appearanceError}<div class="error-box" role="alert">{appearanceError}</div>{/if}
       <form onsubmit={(e) => { e.preventDefault(); void save(); }}>
         <fieldset disabled={!ready}>
-        <section class="settings-section"><h2><Icon name="pen" size={18} />기본 펜</h2>
+        <section class="settings-section"><h2><Icon name="pen" size={18} />시작 기본 펜</h2>
           <div class="pen-preview" style:--ink={draft.color}><svg viewBox="0 0 360 70" aria-hidden="true"><path d="M18 47C60 10 70 64 112 34S159 57 210 27S277 40 337 23" fill="none" stroke="currentColor" stroke-width={draft.width} stroke-linecap="round" /></svg><span>{draft.width}px <code>{draft.color.toUpperCase()}</code></span></div>
           <div class="settings-palette"><ColorPalette value={draft.color} colors={draft.quickColors} onchange={(color) => appearance({ color })} onpalettechange={(quickColors) => appearance({ quickColors })} /></div>
           <div class="setting-row"><label for="pen-width">펜 굵기</label><div class="range-value"><input id="pen-width" type="range" min="1" max="32" step="1" value={draft.width} oninput={(e) => appearance({ width: Number(e.currentTarget.value) })} /><output>{draft.width}px</output></div></div>
           <div class="setting-row"><label for="text-size">글자 크기</label><div class="range-value"><input id="text-size" type="range" min="12" max="96" step="2" value={draft.textSize} oninput={(e) => appearance({ textSize: Number(e.currentTarget.value) })} /><output>{draft.textSize}px</output></div></div>
-          <p class="appearance-status" role="status">{savingAppearance ? '저장 중…' : appearanceError ? '변경을 저장하지 못했습니다.' : '자동 저장 · 기존 필기의 색상은 유지됩니다.'}</p>
+          <p class="appearance-status" role="status">{savingAppearance ? '저장 중…' : appearanceError ? '변경을 저장하지 못했습니다.' : '자동 저장 · 도구막대에서 바꾼 색·굵기는 이 기본값을 바꾸지 않습니다.'}</p>
+        </section>
+        <section class="settings-section"><h2><Icon name="pen" size={18} />빠른 프리셋</h2>
+          <p class="field-hint">도구막대의 1·2·3 버튼 또는 Shift+1–3으로 불러옵니다. 이름은 입력을 마치면 저장됩니다.</p>
+          {#each draft.presets as preset, i}
+            <div class="preset-setting">
+              <span class="preset-chip" style:background={preset.brush.color}>{i + 1}</span>
+              <div class="preset-details"><input aria-label={`프리셋 ${i + 1} 이름`} maxlength="24" value={preset.name} onchange={(e) => { const name = e.currentTarget.value; void action(async () => accept(await bridge.updatePreset(i, name))); }} /><small>{preset.brush.tool === 'text' ? `텍스트 · ${preset.brush.textSize}px` : `펜 · ${preset.brush.width}px`} · {preset.brush.color.toUpperCase()}</small></div>
+              <button type="button" class="secondary" onclick={() => action(async () => accept(await bridge.updateBrush(preset.brush)))}>불러오기</button>
+              <button type="button" class="secondary" onclick={() => action(async () => { if (appState) accept(await bridge.updatePreset(i, undefined, appState.brush)); })}>현재 도구로 저장</button>
+            </div>
+          {/each}
         </section>
         <section class="settings-section"><h2><Icon name="keyboard" size={18} />단축키</h2>
           <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>

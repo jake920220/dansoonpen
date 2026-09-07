@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { SettingsWriter } from './settings-writer';
-import { DEFAULT_SETTINGS, type AppSettings, type AppState } from '../shared/types';
+import { DEFAULT_SETTINGS, defaultBrush, type AppSettings, type AppState } from '../shared/types';
 
 afterEach(() => vi.useRealTimers());
-const state = (settings = DEFAULT_SETTINGS): AppState => ({ settings, mode: 'interact', activeDisplayId: null, revision: 1, error: null, displays: [] });
+const state = (settings = DEFAULT_SETTINGS): AppState => ({ settings, brush: defaultBrush(settings), mode: 'interact', activeDisplayId: null, revision: 1, error: null, displays: [] });
 it('coalesces rapid edits and sends only the changed fields', async () => {
   vi.useFakeTimers();
   const save = vi.fn(async () => state());

@@ -90,3 +90,10 @@
 @media (max-width: 760px) { .control-shell { grid-template-columns: 160px minmax(0, 1fr); } .control-main { padding: 22px; } .ink-sample { width: 140px; right: -8px; top: 65px; opacity: .6; } .welcome h1 { font-size: 30px; } }
 @media (max-width: 580px) { .control-shell { grid-template-columns: 66px minmax(0, 1fr); } .sidebar { padding: 22px 9px; } .brand > span:nth-child(2), .brand-caption { display: none; } .sidebar nav button { font-size: 0; padding: 12px; gap: 0; } .sidebar-bottom { font-size: 0; justify-content: center; } .version { padding-left: 0; text-align: center; } .control-main { padding: 20px; } .ink-sample { display: none; } .page-heading .local-label { display: none; } .display-card { flex-wrap: wrap; } .display-card select { max-width: none; width: 100%; margin-left: 0; } .quick-guide { gap: 9px; } .shortcut-input { width: 150px; } .range-value input { width: 90px; } }
 .settings-heading + form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+.preset-setting { display: flex; gap: 10px; align-items: center; padding: 10px 0; flex-wrap: wrap; }
+.preset-chip { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #17202c; font-size: 12px; }
+.preset-details { flex: 1; min-width: 110px; }
+.preset-details input { width: 100%; background: transparent; border: 1px solid #3c4656; padding: 6px; border-radius: 5px; color: #dbe3ef; font-size: 12px; }
+.preset-details small { display: block; color: #8998af; margin-top: 5px; font-size: 10px; }
+.preset-setting .secondary { font-size: 10px; padding: 8px; }

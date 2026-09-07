@@ -1,5 +1,5 @@
 // Development-only browser adapter. Never used to claim native overlay support.
-import { DEFAULT_SETTINGS, type Annotation, type AppState, type SceneEdit, type SceneSnapshot, type SceneUpdate } from '../shared/types';
+import { DEFAULT_SETTINGS, defaultBrush, type Annotation, type AppState, type SceneEdit, type SceneSnapshot, type SceneUpdate } from '../shared/types';
 
 type Listener = (payload: unknown) => void;
 const listeners = new Map<string, Set<Listener>>();
@@ -7,7 +7,7 @@ const displayId = 'preview-display';
 let state: AppState = {
   mode: new URLSearchParams(location.search).get('view') === 'overlay' ? 'draw' : 'interact',
   activeDisplayId: displayId, revision: 1, error: null,
-  settings: structuredClone(DEFAULT_SETTINGS),
+  settings: structuredClone(DEFAULT_SETTINGS), brush: defaultBrush(DEFAULT_SETTINGS),
   displays: [{ id: displayId, name: '미리보기 화면', x: 0, y: 0, width: window.innerWidth, height: window.innerHeight, scaleFactor: devicePixelRatio, isPrimary: true, connected: true }],
 };
 let scene: SceneSnapshot = { displayId, revision: 0, clearGeneration: 0, annotations: [] };
@@ -28,13 +28,28 @@ export const preview = {
     return () => { set.delete(fn as Listener); };
   },
   async invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+    args = JSON.parse(JSON.stringify(args)); // Match the native JSON boundary, including Svelte proxies.
     let result: unknown;
     switch (command) {
       case 'get_state': result = structuredClone(state); break;
       case 'get_scene': result = structuredClone(scene); break;
       case 'set_mode': state.mode = args.mode as AppState['mode']; result = updateState(); break;
       case 'select_display': state.activeDisplayId = String(args.displayId); result = updateState(); break;
-      case 'update_settings': state.settings = { ...state.settings, ...structuredClone(args.settings as Partial<AppState['settings']>) }; result = updateState(); break;
+      case 'update_settings': {
+        const patch = structuredClone(args.settings as Partial<AppState['settings']>);
+        state.settings = { ...state.settings, ...patch };
+        for (const key of ['color', 'width', 'textSize'] as const) {
+          if (key in patch) Object.assign(state.brush, { [key]: patch[key] });
+        }
+        result = updateState(); break;
+      }
+      case 'update_brush': state.brush = { ...state.brush, ...structuredClone(args.brush as Partial<AppState['brush']>) }; result = updateState(); break;
+      case 'update_preset': {
+        const preset = state.settings.presets[Number(args.index)];
+        if (typeof args.name === 'string') preset.name = args.name;
+        if (args.brush) preset.brush = structuredClone(args.brush as AppState['brush']);
+        result = updateState(); break;
+      }
       case 'capture_shortcut': break;
       case 'apply_edit': {
         const edit = args.edit as SceneEdit;

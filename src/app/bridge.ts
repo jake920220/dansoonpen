@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { AppSettings, AppState, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
+import type { AppSettings, AppState, BrushSettings, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
 
 export const native = isTauri();
 const preview = !native && import.meta.env.DEV ? import('../dev/preview').then((m) => m.preview) : null;
@@ -22,6 +22,8 @@ export const bridge = {
   setMode: (mode: Mode) => call<AppState>('set_mode', { mode }),
   selectDisplay: (displayId: string) => call<AppState>('select_display', { displayId }),
   updateSettings: (settings: Partial<AppSettings>) => call<AppState>('update_settings', { settings }),
+  updateBrush: (brush: Partial<BrushSettings>) => call<AppState>('update_brush', { brush }),
+  updatePreset: (index: number, name?: string, brush?: BrushSettings) => call<AppState>('update_preset', { index, name, brush }),
   captureShortcut: (active: boolean) => call<void>('capture_shortcut', { active }),
   getScene: (displayId: string) => call<SceneSnapshot>('get_scene', { displayId }),
   applyEdit: (edit: SceneEdit) => call<SceneSnapshot>('apply_edit', { edit }),

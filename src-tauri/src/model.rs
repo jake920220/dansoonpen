@@ -99,9 +99,88 @@ fn finite_range(n: f64, min: f64, max: f64) -> bool {
 pub fn valid_color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Tool {
+    Pen,
+    Eraser,
+    Text,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BrushSettings {
+    pub tool: Tool,
+    pub color: String,
+    pub width: f64,
+    pub text_size: f64,
+}
+impl BrushSettings {
+    pub fn from_defaults(settings: &AppSettings) -> Self {
+        Self {
+            tool: Tool::Pen,
+            color: settings.color.clone(),
+            width: settings.width,
+            text_size: settings.text_size,
+        }
+    }
+    pub fn validate(&self) -> Result<(), String> {
+        if valid_color(&self.color)
+            && finite_range(self.width, 1., 32.)
+            && finite_range(self.text_size, 8., 144.)
+        {
+            Ok(())
+        } else {
+            Err("도구 색상·굵기·글자 크기가 허용 범위를 벗어났습니다.".into())
+        }
+    }
+}
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BrushPatch {
+    pub tool: Option<Tool>,
+    pub color: Option<String>,
+    pub width: Option<f64>,
+    pub text_size: Option<f64>,
+}
+impl BrushPatch {
+    pub fn apply(self, current: &BrushSettings) -> BrushSettings {
+        BrushSettings {
+            tool: self.tool.unwrap_or(current.tool),
+            color: self.color.unwrap_or_else(|| current.color.clone()),
+            width: self.width.unwrap_or(current.width),
+            text_size: self.text_size.unwrap_or(current.text_size),
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BrushPreset {
+    pub name: String,
+    pub brush: BrushSettings,
+}
+fn default_presets() -> Vec<BrushPreset> {
+    [
+        ("기본 강조", Tool::Pen, "#ffcf56", 12., 28.),
+        ("빨간 밑줄", Tool::Pen, "#ff6b6b", 4., 28.),
+        ("민트 메모", Tool::Text, "#57d9c6", 6., 32.),
+    ]
+    .into_iter()
+    .map(|(name, tool, color, width, text_size)| BrushPreset {
+        name: name.into(),
+        brush: BrushSettings {
+            tool,
+            color: color.into(),
+            width,
+            text_size,
+        },
+    })
+    .collect()
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AppSettings {
+    #[serde(default = "default_presets")]
+    pub presets: Vec<BrushPreset>,
     pub version: u32,
     pub color: String,
     pub width: f64,
@@ -114,7 +193,8 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            version: 2,
+            version: 3,
+            presets: default_presets(),
             color: "#ffcf56".into(),
             width: 12.,
             text_size: 28.,
@@ -140,8 +220,35 @@ impl Default for AppSettings {
     }
 }
 impl AppSettings {
+    pub fn replace_preset(
+        &self,
+        index: usize,
+        name: Option<String>,
+        brush: Option<BrushSettings>,
+    ) -> Result<Self, String> {
+        let mut next = self.clone();
+        let preset = next
+            .presets
+            .get_mut(index)
+            .ok_or("프리셋 번호가 올바르지 않습니다.")?;
+        if let Some(name) = name {
+            preset.name = name.trim().into();
+        }
+        if let Some(brush) = brush {
+            preset.brush = brush;
+        }
+        next.validate()?;
+        Ok(next)
+    }
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 2
+        if self.version != 3
+            || self.presets.len() != 3
+            || self.presets.iter().any(|p| {
+                p.name.trim().is_empty()
+                    || p.name.chars().count() > 24
+                    || p.name.chars().any(char::is_control)
+                    || p.brush.validate().is_err()
+            })
             || !valid_color(&self.color)
             || !finite_range(self.width, 1., 32.)
             || !finite_range(self.text_size, 8., 144.)
@@ -160,6 +267,7 @@ impl AppSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub presets: Option<Vec<BrushPreset>>,
     pub version: Option<u32>,
     pub color: Option<String>,
     pub width: Option<f64>,
@@ -170,8 +278,17 @@ pub struct SettingsPatch {
     pub reduce_motion: Option<bool>,
 }
 impl SettingsPatch {
+    pub fn brush_patch(&self) -> BrushPatch {
+        BrushPatch {
+            color: self.color.clone(),
+            width: self.width,
+            text_size: self.text_size,
+            ..Default::default()
+        }
+    }
     pub fn apply(self, current: &AppSettings) -> AppSettings {
         AppSettings {
+            presets: self.presets.unwrap_or_else(|| current.presets.clone()),
             version: self.version.unwrap_or(current.version),
             color: self.color.unwrap_or_else(|| current.color.clone()),
             width: self.width.unwrap_or(current.width),
@@ -209,6 +326,7 @@ pub struct AppState {
     pub active_display_id: Option<String>,
     pub displays: Vec<DisplayInfo>,
     pub settings: AppSettings,
+    pub brush: BrushSettings,
     pub revision: u64,
     pub error: Option<String>,
 }

@@ -407,6 +407,7 @@ async fn update_settings(
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
+        let brush = settings.brush_patch().apply(&d.app.brush);
         let settings = settings.apply(&d.app.settings);
         let wanted = shortcuts(&settings)?;
         if d.capturing_shortcut
@@ -434,11 +435,50 @@ async fn update_settings(
             return Err(error);
         }
         d.app.settings = settings;
+        d.app.brush = brush;
         d.app.error = app
             .state::<TrayShortcuts>()
             .update(&d.app.settings)
             .err()
             .map(|e| format!("설정은 저장했지만 메뉴 단축키 표시를 갱신하지 못했습니다: {e}"));
+        emit_state(&app, &mut d);
+        Ok(d.app.clone())
+    })
+    .await
+}
+#[tauri::command]
+async fn update_brush(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    brush: BrushPatch,
+) -> Result<AppState, String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let s = lock(&app);
+        let mut d = s.0.lock().map_err(|e| e.to_string())?;
+        let brush = brush.apply(&d.app.brush);
+        brush.validate()?;
+        d.app.brush = brush;
+        emit_state(&app, &mut d);
+        Ok(d.app.clone())
+    })
+    .await
+}
+#[tauri::command]
+async fn update_preset(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    index: usize,
+    name: Option<String>,
+    brush: Option<BrushSettings>,
+) -> Result<AppState, String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let s = lock(&app);
+        let mut d = s.0.lock().map_err(|e| e.to_string())?;
+        let next = d.app.settings.replace_preset(index, name, brush)?;
+        settings::save(&d.settings_path, &next)?;
+        d.app.settings = next;
         emit_state(&app, &mut d);
         Ok(d.app.clone())
     })
@@ -722,6 +762,8 @@ pub fn run() {
             set_mode,
             select_display,
             update_settings,
+            update_brush,
+            update_preset,
             capture_shortcut,
             get_scene,
             apply_edit,
@@ -745,6 +787,7 @@ pub fn run() {
                     active_display_id: None,
                     displays: vec![],
                     settings: loaded.clone(),
+                    brush: BrushSettings::from_defaults(&loaded),
                     revision: 0,
                     error,
                 },

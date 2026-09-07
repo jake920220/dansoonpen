@@ -3,7 +3,7 @@
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
   import { CanvasRenderer } from '../canvas/renderer';
   import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
-  import { DEFAULT_SETTINGS, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
+  import { DEFAULT_SETTINGS, defaultBrush, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
   import ToolbarFrame from './ToolbarFrame.svelte';
   import ColorPalette from './ColorPalette.svelte';
@@ -17,7 +17,6 @@
   let renderer: CanvasRenderer | undefined;
   let appState = $state.raw<AppState | null>(null);
   let error = $state('');
-  let tool = $state<Tool>('pen');
   let showPalette = $state(false);
   let localWidth = $state(DEFAULT_SETTINGS.width);
   let localTextSize = $state(DEFAULT_SETTINGS.textSize);
@@ -35,9 +34,14 @@
   let edits: Promise<unknown> = Promise.resolve();
   let disposed = false;
   let optimisticSettings = $state<Partial<AppSettings>>({});
+  let optimisticBrush = $state<Partial<BrushSettings>>({});
+  let presetSlot = $state(0);
+  let presetStatus = $state('');
   let textCommit: Promise<void> | null = null;
   let drawing = $derived(appState?.mode === 'draw' && appState?.activeDisplayId === displayId);
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
+  let brush = $derived({ ...(appState?.brush ?? defaultBrush(DEFAULT_SETTINGS)), ...optimisticBrush });
+  let tool = $derived(brush.tool);
   let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
 
   function visibleAnnotations(): Annotation[] {
@@ -74,8 +78,8 @@
     const leaving = drawing && (next.mode !== 'draw' || next.activeDisplayId !== displayId);
     if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
     appState = next;
-    localWidth = optimisticSettings.width ?? next.settings.width;
-    localTextSize = optimisticSettings.textSize ?? next.settings.textSize;
+    localWidth = optimisticBrush.width ?? next.brush.width;
+    localTextSize = optimisticBrush.textSize ?? next.brush.textSize;
   }
   function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); }
   onMount(() => {
@@ -91,7 +95,7 @@
         if (!disposed) { acceptState(initialState); acceptScene(initialScene); }
       } catch (e) { if (!disposed) error = message(e); }
     })();
-    return () => { disposed = true; unlisteners.forEach((off) => off()); void settingsWriter.flush(); renderer?.dispose(); };
+    return () => { disposed = true; unlisteners.forEach((off) => off()); void settingsWriter.flush(); void brushWriter.flush(); renderer?.dispose(); };
   });
   function submit(added: Annotation[], removedIds: string[]) {
     if (!added.length && !removedIds.length) return;
@@ -129,14 +133,14 @@
     if (textEntry) { commitText(); return; }
     const start = point(event);
     if (tool === 'text') {
-      textEntry = { ...start, x: Math.max(10, Math.min(start.x, innerWidth - 450)), y: Math.max(80, Math.min(start.y, innerHeight - 160)), value: '', color: settings.color, fontSize: localTextSize };
+      textEntry = { ...start, x: Math.max(10, Math.min(start.x, innerWidth - 450)), y: Math.max(80, Math.min(start.y, innerHeight - 160)), value: '', color: brush.color, fontSize: localTextSize };
       void tick().then(() => textarea?.focus());
       return;
     }
     activePointer = event.pointerId; lastPoint = start;
     canvas.setPointerCapture(event.pointerId);
     if (tool === 'pen') {
-      currentStroke = { kind: 'stroke', id: crypto.randomUUID(), points: [start], color: settings.color, width: localWidth };
+      currentStroke = { kind: 'stroke', id: crypto.randomUUID(), points: [start], color: brush.color, width: localWidth };
       renderer?.setPreview(currentStroke);
     } else { erased = new Set(); erase(start, start); }
     event.preventDefault();
@@ -175,7 +179,7 @@
     lastPoint = null;
   }
   function cancelPointer(event: PointerEvent) { if (activePointer === event.pointerId) finishPointer(); }
-  function chooseTool(next: Tool) { finishPointer(); commitText(); tool = next; showPalette = false; if (eraserCursor) eraserCursor.style.display = 'none'; }
+  function chooseTool(next: Tool) { finishPointer(); commitText(); updateBrush({ tool: next }); showPalette = false; if (eraserCursor) eraserCursor.style.display = 'none'; }
   function commitText(): Promise<void> {
     if (textCommit) return textCommit;
     if (!textEntry) return Promise.resolve();
@@ -201,14 +205,29 @@
     finishPointer(); await commitText(); showPalette = false; error = '';
     await edits;
     await settingsWriter.flush();
+    await brushWriter.flush();
     try { await fn(); } catch (e) { error = message(e); }
   }
   const settingsWriter = new SettingsWriter(bridge.updateSettings, acceptState, (pending) => {
     optimisticSettings = pending;
-    localWidth = pending.width ?? appState?.settings.width ?? DEFAULT_SETTINGS.width;
-    localTextSize = pending.textSize ?? appState?.settings.textSize ?? DEFAULT_SETTINGS.textSize;
   }, (e) => { if (!disposed) error = message(e); });
-  function updateSetting(patch: Partial<AppSettings>) { settingsWriter.update(patch); }
+  const brushWriter = new SettingsWriter<BrushSettings>(bridge.updateBrush, acceptState, (pending) => {
+    optimisticBrush = pending;
+    localWidth = pending.width ?? appState?.brush.width ?? DEFAULT_SETTINGS.width;
+    localTextSize = pending.textSize ?? appState?.brush.textSize ?? DEFAULT_SETTINGS.textSize;
+  }, (e) => { if (!disposed) error = message(e); });
+  function updateBrush(patch: Partial<BrushSettings>) { presetStatus = ''; brushWriter.update(patch); }
+  function applyPreset(index: number) {
+    finishPointer(); void commitText();
+    updateBrush(settings.presets[index].brush); showPalette = false; hideEraser();
+  }
+  function resetBrush() { finishPointer(); void commitText(); updateBrush(defaultBrush(settings)); }
+  async function savePreset() {
+    const current = { ...brush }; const index = Number(presetSlot);
+    presetStatus = ''; error = '';
+    try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
+    catch (e) { error = message(e); }
+  }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
     if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
@@ -228,11 +247,12 @@
     }
     if (!native && matchesShortcut(event, settings.clearShortcut)) { event.preventDefault(); void action(bridge.clearAll); return; }
     if (!native && matchesShortcut(event, settings.toggleShortcut)) { event.preventDefault(); void action(() => bridge.setMode('interact')); return; }
+    if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && /^Digit[1-3]$/.test(event.code) && !event.repeat) { event.preventDefault(); applyPreset(Number(event.code.slice(-1)) - 1); return; }
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
     const key = event.key.toLowerCase();
     if (key === 'p' || key === 'e' || key === 't') { event.preventDefault(); chooseTool(key === 'p' ? 'pen' : key === 'e' ? 'eraser' : 'text'); }
-    else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateSetting({ color: settings.quickColors[Number(key) - 1] }); }
-    else if (key === '[' || key === ']') { event.preventDefault(); localWidth = Math.max(1, Math.min(32, localWidth + (key === ']' ? 1 : -1))); updateSetting({ width: localWidth }); }
+    else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
+    else if (key === '[' || key === ']') { event.preventDefault(); localWidth = Math.max(1, Math.min(32, localWidth + (key === ']' ? 1 : -1))); updateBrush({ width: localWidth }); }
   }
   function textKey(event: KeyboardEvent) {
     if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
@@ -256,7 +276,10 @@
         <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
-      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={settings.color}></span><span class="width-dot" style:width={`${Math.min(14, localWidth + 2)}px`} style:height={`${Math.min(14, localWidth + 2)}px`}></span></button>
+      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="width-dot" style:width={`${Math.min(14, localWidth + 2)}px`} style:height={`${Math.min(14, localWidth + 2)}px`}></span></button>
+      <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
+        {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
+      </div>
       <span class="toolbar-divider"></span>
       <div class="tool-group">
         <button aria-label="실행 취소" title="실행 취소 (⌘/Ctrl+Z)" onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
@@ -269,10 +292,13 @@
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     {#snippet panel()}
       <div class="palette-panel">
-        <div class="palette-heading"><span>펜 색상</span><code>{settings.color.toUpperCase()}</code></div>
-        <ColorPalette value={settings.color} colors={settings.quickColors} onchange={(color) => updateSetting({ color })} onpalettechange={(quickColors) => updateSetting({ quickColors })} />
-        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateSetting({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateSetting({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
-        <p>숫자 1–6으로 색상 · [ ]로 굵기 조절</p>
+        <div class="palette-heading"><span>펜 색상</span><code>{brush.color.toUpperCase()}</code></div>
+        <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />
+        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateBrush({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateBrush({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
+        <div class="brush-reset"><span>현재 도구에만 적용됩니다.</span><button onclick={resetBrush}>기본 펜으로</button></div>
+        <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>
+        {#if presetStatus}<p role="status">{presetStatus}</p>{/if}
+        <p>1–6 색상 · [ ] 굵기 · Shift+1–3 프리셋</p>
       </div>
     {/snippet}
   </ToolbarFrame>
