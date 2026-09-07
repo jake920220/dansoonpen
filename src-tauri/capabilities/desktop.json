@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Local control and overlay windows can listen to native state events. Custom commands validate window roles in Rust.",
+  "windows": ["control", "overlay-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}
