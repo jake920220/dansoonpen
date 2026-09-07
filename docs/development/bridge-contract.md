@@ -10,7 +10,7 @@ Commands (Tauri invoke):
 - `capture_shortcut { active }` -> void; control window only. Suspend the app's global shortcuts while its focused recorder captures a key combination. Restore on exit, native focus loss or control close.
 - `get_scene { displayId }` -> SceneSnapshot
 - `apply_edit { edit: SceneEdit }` -> SceneSnapshot; add/remove as one undoable edit
-- `clear_all` -> void; remove existing annotations from all displays in one undoable action
+- `clear_all` -> void; remove existing annotations from all displays in one undoable action, then leave draw mode and release input/restore prior app focus immediately while the fade continues. Advance clear generation before publishing the mode change. The global clear shortcut and tray call the same native routine. If already interacting, preserve current app focus.
 - `undo` / `redo` -> void; global chronological undo, including all-monitor clear
 - `show_control` -> void
 - `quit_app` -> void

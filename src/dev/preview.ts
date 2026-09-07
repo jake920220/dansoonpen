@@ -46,6 +46,7 @@ export const preview = {
         if (scene.annotations.length) { history.push(scene.annotations); future = []; }
         scene.clearGeneration++;
         updateScene([], scene.annotations);
+        state.mode = 'interact'; updateState();
         break;
       case 'undo': { const previous = history.pop(); if (previous) { future.push(scene.annotations); updateScene(previous); } break; }
       case 'redo': { const next = future.pop(); if (next) { history.push(scene.annotations); updateScene(next); } break; }

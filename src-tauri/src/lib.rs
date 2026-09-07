@@ -222,6 +222,16 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
         }
     }
 }
+fn clear_and_interact(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    let duration = fade(data);
+    // Advance the clear generation before mode-exit handlers can submit a final edit.
+    // Keep the overlay visible so its existing fade can finish after input is released.
+    emit_scenes(app, data.scenes.clear(duration));
+    if data.app.mode == Mode::Draw {
+        change_mode(app, data, Mode::Interact)?;
+    }
+    Ok(())
+}
 fn report(app: &tauri::AppHandle, data: &mut RuntimeState, error: String) {
     data.app.error = Some(error);
     emit_state(app, data);
@@ -517,9 +527,7 @@ async fn clear_all(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), S
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
-        let duration = fade(&d);
-        emit_scenes(&app, d.scenes.clear(duration));
-        Ok(())
+        clear_and_interact(&app, &mut d)
     })
     .await
 }
@@ -637,8 +645,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                             let _ = change_mode(app, &mut d, Mode::Interact);
                         }
                         "clear" => {
-                            let duration = fade(&d);
-                            emit_scenes(app, d.scenes.clear(duration));
+                            let _ = clear_and_interact(app, &mut d);
                         }
                         _ => {}
                     }
@@ -703,8 +710,7 @@ pub fn run() {
                             } else if Shortcut::from_str(&d.app.settings.clear_shortcut)
                                 .is_ok_and(|s| s.id() == id)
                             {
-                                let duration = fade(&d);
-                                emit_scenes(&handle, d.scenes.clear(duration));
+                                let _ = clear_and_interact(&handle, &mut d);
                             }
                         };
                     });
