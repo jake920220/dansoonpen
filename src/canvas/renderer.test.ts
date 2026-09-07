@@ -145,6 +145,28 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     expect(ctx.textBaseline).toBe('top');
   });
 
+  it('composites each highlighter path once, multiplies fade alpha, and leaves new ink unchanged', () => {
+    const marker = { ...stroke('marker', '#ffcf56'), opacity: 0.32, width: 24, points: [{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }, { x: 100, y: 0 }] };
+    renderer.setScene([marker]); frame(0);
+    expect(draws).toEqual([{ color: '#ffcf56', alpha: 0.32 }]);
+    expect(callbacks.size).toBe(0);
+    renderer.setScene([]); renderer.fadeOut([marker], 350);
+    renderer.setScene([stroke('new', '#f00')]); draws.length = 0; frame(175);
+    expect(draws).toEqual([{ color: '#ffcf56', alpha: 0.16 }, { color: '#f00', alpha: 1 }]);
+  });
+
+  it('snapshots arrow endpoints for fading and renders the shaft plus both head segments', () => {
+    const arrow = { kind: 'arrow' as const, id: 'arrow', start: { x: 10, y: 20 }, end: { x: 110, y: 20 }, width: 4, color: '#ffcf56' };
+    renderer.fadeOut([arrow], 350); arrow.end.x = 999;
+    frame(175);
+    expect(ctx.lineTo).toHaveBeenCalledWith(110, 20);
+    expect(ctx.lineTo).not.toHaveBeenCalledWith(999, 20);
+    expect(ctx.lineTo).toHaveBeenCalledTimes(3);
+    expect(draws).toEqual([{ color: '#ffcf56', alpha: 0.5 }]);
+    renderer.setScene([{ ...arrow, end: { x: 110, y: 20 } }]); draws.length = 0; frame(200);
+    expect(draws).toEqual([{ color: '#ffcf56', alpha: 1 }]); expect(callbacks.size).toBe(0);
+  });
+
   it('dispose cancels outstanding animation and releases retained drawing state', () => {
     renderer.resize(1920, 1080, 2);
     renderer.fadeOut([stroke('old')], 350);

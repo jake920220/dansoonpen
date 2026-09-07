@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
+  import { arrowEndpoint } from '../canvas/arrow';
   import { CanvasRenderer } from '../canvas/renderer';
   import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
-  import { DEFAULT_SETTINGS, defaultBrush, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
+  import { DEFAULT_SETTINGS, TOOL_LABELS, defaultBrush, type ArrowAnnotation, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
   import ToolbarFrame from './ToolbarFrame.svelte';
   import ColorPalette from './ColorPalette.svelte';
@@ -26,6 +27,7 @@
   let compositionEndedAt = 0;
   let scene: SceneSnapshot = { displayId: '', revision: -1, clearGeneration: 0, annotations: [] };
   let currentStroke: StrokeAnnotation | null = null;
+  let currentArrow: ArrowAnnotation | null = null;
   let activePointer: number | null = null;
   let lastPoint: Point | null = null;
   let erased = new Set<string>();
@@ -42,6 +44,7 @@
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
   let brush = $derived({ ...(appState?.brush ?? defaultBrush(DEFAULT_SETTINGS)), ...optimisticBrush });
   let tool = $derived(brush.tool);
+  let activeWidth = $derived(tool === 'highlighter' ? brush.highlighterWidth : localWidth);
   let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
 
   function visibleAnnotations(): Annotation[] {
@@ -54,12 +57,13 @@
     if (next.clearGeneration > scene.clearGeneration && scene.revision >= 0) {
       const visible = visibleAnnotations();
       if (currentStroke) visible.push(currentStroke);
+      if (currentArrow) visible.push(currentArrow);
       if (textEntry?.value.trim()) visible.push({ kind: 'text', id: crypto.randomUUID(), x: textEntry.x, y: textEntry.y, text: textarea?.value ?? textEntry.value, color: textEntry.color, fontSize: textEntry.fontSize });
       const ids = new Set(removed.map((a) => a.id));
       removed = [...removed, ...visible.filter((a) => !ids.has(a.id))];
       const pointer = activePointer; activePointer = null;
       if (pointer !== null && canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
-      currentStroke = null; lastPoint = null; erased.clear();
+      currentStroke = null; currentArrow = null; lastPoint = null; erased.clear();
       pendingAdds.clear(); pendingRemovals.clear();
       textEntry = null; composing = false;
       renderer?.setPreview(null);
@@ -139,9 +143,12 @@
     }
     activePointer = event.pointerId; lastPoint = start;
     canvas.setPointerCapture(event.pointerId);
-    if (tool === 'pen') {
-      currentStroke = { kind: 'stroke', id: crypto.randomUUID(), points: [start], color: brush.color, width: localWidth };
+    if (tool === 'pen' || tool === 'highlighter') {
+      currentStroke = { kind: 'stroke', id: crypto.randomUUID(), points: [start], color: brush.color, width: activeWidth, opacity: tool === 'highlighter' ? brush.highlighterOpacity : 1 };
       renderer?.setPreview(currentStroke);
+    } else if (tool === 'arrow') {
+      currentArrow = { kind: 'arrow', id: crypto.randomUUID(), start, end: { ...start }, color: brush.color, width: localWidth };
+      renderer?.setPreview(currentArrow);
     } else { erased = new Set(); erase(start, start); }
     event.preventDefault();
   }
@@ -157,6 +164,9 @@
       }
       renderer?.setPreview(currentStroke);
       if (currentStroke.points.length >= 100_000) { finishPointer(); error = '긴 획을 저장했습니다. 마우스를 놓고 이어서 그려 주세요.'; }
+    } else if (currentArrow) {
+      currentArrow.end = arrowEndpoint(currentArrow.start, point(event), event.shiftKey);
+      renderer?.setPreview(currentArrow);
     } else if (lastPoint) {
       for (const sample of actual) { const next = point(sample); erase(lastPoint, next); lastPoint = next; }
     }
@@ -165,6 +175,7 @@
   function up(event: PointerEvent) {
     if (event.pointerId !== activePointer) return;
     if (currentStroke && currentStroke.points.length < 100_000) appendStrokePoint(currentStroke.points, point(event), 0, true);
+    else if (currentArrow) currentArrow.end = arrowEndpoint(currentArrow.start, point(event), event.shiftKey);
     else if (lastPoint) erase(lastPoint, point(event));
     finishPointer();
   }
@@ -175,6 +186,10 @@
     if (currentStroke) {
       const stroke = currentStroke; currentStroke = null;
       submit([stroke], []); renderer?.setPreview(null);
+    } else if (currentArrow) {
+      const arrow = currentArrow; currentArrow = null;
+      if (Math.hypot(arrow.end.x - arrow.start.x, arrow.end.y - arrow.start.y) >= 4) submit([arrow], []);
+      renderer?.setPreview(null);
     } else if (erased.size) { const ids = [...erased]; erased.clear(); submit([], ids); }
     lastPoint = null;
   }
@@ -228,6 +243,7 @@
     try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
     catch (e) { error = message(e); }
   }
+  function setWidth(width: number) { updateBrush(tool === 'highlighter' ? { highlighterWidth: width } : { width }); }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
     if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
@@ -250,9 +266,10 @@
     if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && /^Digit[1-3]$/.test(event.code) && !event.repeat) { event.preventDefault(); applyPreset(Number(event.code.slice(-1)) - 1); return; }
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
     const key = event.key.toLowerCase();
-    if (key === 'p' || key === 'e' || key === 't') { event.preventDefault(); chooseTool(key === 'p' ? 'pen' : key === 'e' ? 'eraser' : 'text'); }
+    const tools: Record<string, Tool> = { p: 'pen', e: 'eraser', t: 'text', a: 'arrow', h: 'highlighter' };
+    if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
-    else if (key === '[' || key === ']') { event.preventDefault(); localWidth = Math.max(1, Math.min(32, localWidth + (key === ']' ? 1 : -1))); updateBrush({ width: localWidth }); }
+    else if (key === '[' || key === ']') { event.preventDefault(); setWidth(Math.max(tool === 'highlighter' ? 8 : 1, Math.min(tool === 'highlighter' ? 64 : 32, activeWidth + (key === ']' ? 1 : -1)))); }
   }
   function textKey(event: KeyboardEvent) {
     if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
@@ -272,11 +289,13 @@
       <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
       <div class="tool-group">
         <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title="펜 (P)" aria-label="펜" onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
+        <button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title="형광펜 (H)" aria-label="형광펜" onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>
+        <button class:chosen={tool === 'arrow'} aria-pressed={tool === 'arrow'} title="화살표 (A) · Shift로 방향 맞추기" aria-label="화살표" onclick={() => chooseTool('arrow')}><Icon name="arrow" /></button>
         <button class:chosen={tool === 'eraser'} aria-pressed={tool === 'eraser'} title="지우개 (E) · 획 단위로 지우기" aria-label="지우개" onclick={() => chooseTool('eraser')}><Icon name="eraser" /></button>
         <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
-      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="width-dot" style:width={`${Math.min(14, localWidth + 2)}px`} style:height={`${Math.min(14, localWidth + 2)}px`}></span></button>
+      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="width-dot" style:width={`${Math.min(14, activeWidth + 2)}px`} style:height={`${Math.min(14, activeWidth + 2)}px`}></span></button>
       <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
         {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
       </div>
@@ -292,9 +311,10 @@
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     {#snippet panel()}
       <div class="palette-panel">
-        <div class="palette-heading"><span>펜 색상</span><code>{brush.color.toUpperCase()}</code></div>
+        <div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{brush.color.toUpperCase()}</code></div>
         <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />
-        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : '펜 굵기'}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" bind:value={localTextSize} onchange={() => updateBrush({ textSize: localTextSize })} /><output>{localTextSize}px</output>{:else}<input aria-label="펜 굵기" type="range" min="1" max="32" step="1" bind:value={localWidth} onchange={() => updateBrush({ width: localWidth })} /><output>{localWidth}px</output>{/if}</label>
+        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : `${TOOL_LABELS[tool]} 굵기`}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" value={localTextSize} oninput={(e) => updateBrush({ textSize: Number(e.currentTarget.value) })} /><output>{localTextSize}px</output>{:else}<input aria-label="도구 굵기" type="range" min={tool === 'highlighter' ? 8 : 1} max={tool === 'highlighter' ? 64 : 32} step="1" value={activeWidth} oninput={(e) => setWidth(Number(e.currentTarget.value))} /><output>{activeWidth}px</output>{/if}</label>
+        {#if tool === 'highlighter'}<label class="palette-range"><span>불투명도</span><input aria-label="형광펜 불투명도" type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
         <div class="brush-reset"><span>현재 도구에만 적용됩니다.</span><button onclick={resetBrush}>기본 펜으로</button></div>
         <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>
         {#if presetStatus}<p role="status">{presetStatus}</p>{/if}
@@ -302,7 +322,7 @@
       </div>
     {/snippet}
   </ToolbarFrame>
-  <div class="mode-hint"><span class="hint-dot"></span><strong>{tool === 'text' ? '텍스트' : tool === 'eraser' ? '지우개' : '그리기'}</strong><span class="hint-separator"></span>{#if tool === 'text'}화면을 클릭해 입력하세요{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
+  <div class="mode-hint"><span class="hint-dot"></span><strong>{TOOL_LABELS[tool]}</strong><span class="hint-separator"></span>{#if tool === 'text'}화면을 클릭해 입력하세요{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else if tool === 'arrow'}드래그로 연결 · Shift로 45° 방향 맞추기{:else if tool === 'highlighter'}글자를 가리지 않고 강조하세요{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
 {:else if !native}
   <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>다시 그리기</button><span>그림은 유지됩니다 · {currentDisplay?.name ?? '미리보기'}</span></div>
 {/if}

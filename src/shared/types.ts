@@ -1,14 +1,15 @@
 export type Mode = 'draw' | 'interact';
-export type Tool = 'pen' | 'eraser' | 'text';
+export type Tool = 'pen' | 'eraser' | 'text' | 'arrow' | 'highlighter';
 export interface Point { x: number; y: number }
 export interface StrokeAnnotation {
-  kind: 'stroke'; id: string; points: Point[]; color: string; width: number;
+  kind: 'stroke'; id: string; points: Point[]; color: string; width: number; opacity?: number;
 }
 export interface TextAnnotation {
   kind: 'text'; id: string; x: number; y: number; text: string; color: string; fontSize: number;
 }
-export type Annotation = StrokeAnnotation | TextAnnotation;
-export interface BrushSettings { tool: Tool; color: string; width: number; textSize: number }
+export interface ArrowAnnotation { kind: 'arrow'; id: string; start: Point; end: Point; color: string; width: number }
+export type Annotation = StrokeAnnotation | TextAnnotation | ArrowAnnotation;
+export interface BrushSettings { tool: Tool; color: string; width: number; textSize: number; highlighterWidth: number; highlighterOpacity: number }
 export interface BrushPreset { name: string; brush: BrushSettings }
 export interface AppSettings {
   presets: BrushPreset[];
@@ -29,9 +30,9 @@ export interface SceneEdit { displayId: string; clearGeneration: number; added: 
 export const DEFAULT_SETTINGS: AppSettings = {
   version: 3, color: '#ffcf56', width: 12, textSize: 28,
   presets: [
-    { name: '기본 강조', brush: { tool: 'pen', color: '#ffcf56', width: 12, textSize: 28 } },
-    { name: '빨간 밑줄', brush: { tool: 'pen', color: '#ff6b6b', width: 4, textSize: 28 } },
-    { name: '민트 메모', brush: { tool: 'text', color: '#57d9c6', width: 6, textSize: 32 } },
+    { name: '기본 강조', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 28 } },
+    { name: '빨간 밑줄', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 28 } },
+    { name: '민트 메모', brush: { tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 32 } },
   ],
   quickColors: ['#ffcf56', '#ff6b6b', '#57d9c6', '#78a9ff', '#c4a0ff', '#ffffff'],
   toggleShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+Z' : 'Alt+Shift+Z',
@@ -39,5 +40,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export function defaultBrush(settings: AppSettings): BrushSettings {
-  return { tool: 'pen', color: settings.color, width: settings.width, textSize: settings.textSize };
+  return { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: settings.color, width: settings.width, textSize: settings.textSize };
 }
+
+export const TOOL_LABELS: Record<Tool, string> = { pen: '펜', eraser: '지우개', text: '텍스트', arrow: '화살표', highlighter: '형광펜' };

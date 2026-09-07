@@ -1,3 +1,4 @@
+import { arrowSegments } from './arrow';
 import type { Annotation, Point, TextAnnotation } from '../shared/types';
 
 export const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif';
@@ -107,6 +108,7 @@ function hitAlongSegment(annotation: Annotation, from: Point, to: Point, radius:
     });
   }
   if (!Number.isFinite(annotation.width) || annotation.width <= 0) return false;
+  if (annotation.kind === 'arrow') return arrowSegments(annotation).some(([a, b]) => segmentDistance(from, to, a, b) <= radius + annotation.width / 2);
   const points = finiteStrokePoints(annotation.points);
   if (points.length === 0) return false;
   const reach = radius + annotation.width / 2;

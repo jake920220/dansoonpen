@@ -1,4 +1,5 @@
-import type { Annotation, StrokeAnnotation, TextAnnotation } from '../shared/types';
+import { arrowSegments } from './arrow';
+import type { Annotation, StrokeAnnotation, TextAnnotation, ArrowAnnotation } from '../shared/types';
 import { FONT_FAMILY, TEXT_LINE_HEIGHT, finiteStrokePoints, isFinitePoint, visitStrokePath } from './geometry';
 
 // Fade snapshots are temporary: retain at most this many objects/points and 2 seconds.
@@ -13,7 +14,7 @@ interface FadingAnnotation { annotation: Annotation; startedAt: number; duration
 export class CanvasRenderer {
   private readonly context: CanvasRenderingContext2D;
   private scene: readonly Annotation[] = [];
-  private preview: StrokeAnnotation | null = null;
+  private preview: StrokeAnnotation | ArrowAnnotation | null = null;
   private textPreview: TextAnnotation | null = null;
   private fades: FadingAnnotation[] = [];
   private frame: number | null = null;
@@ -49,7 +50,7 @@ export class CanvasRenderer {
     this.schedule();
   }
 
-  setPreview(stroke: StrokeAnnotation | null): void {
+  setPreview(stroke: StrokeAnnotation | ArrowAnnotation | null): void {
     if (this.disposed) return;
     this.preview = stroke;
     this.schedule();
@@ -76,15 +77,15 @@ export class CanvasRenderer {
       for (let i = annotations.length - 1; i >= 0 && next.length < MAX_FADE_OBJECTS; i--) {
         const annotation = annotations[i];
         if (live.has(annotation.id)) continue;
-        const cost = annotation.kind === 'stroke' ? annotation.points.length : annotation.text.length;
+        const cost = annotationCost(annotation);
         if (pointCount + cost > MAX_FADE_POINTS) continue;
         pointCount += cost;
-        next.push({ annotation: annotation.kind === 'stroke' ? { ...annotation, points: annotation.points.map((point) => ({ ...point })) } : { ...annotation }, startedAt: now, duration });
+        next.push({ annotation: snapshotAnnotation(annotation), startedAt: now, duration });
       }
       next.reverse();
       for (let i = this.fades.length - 1; i >= 0 && next.length < MAX_FADE_OBJECTS; i--) {
         const fade = this.fades[i];
-        const cost = fade.annotation.kind === 'stroke' ? fade.annotation.points.length : fade.annotation.text.length;
+        const cost = annotationCost(fade.annotation);
         if (pointCount + cost > MAX_FADE_POINTS) continue;
         pointCount += cost;
         next.unshift(fade);
@@ -132,7 +133,9 @@ export class CanvasRenderer {
 
   private draw(annotation: Annotation, alpha: number): void {
     const ctx = this.context;
-    ctx.globalAlpha = alpha;
+    const opacity = annotation.kind === 'stroke' ? annotation.opacity ?? 1 : 1;
+    if (!Number.isFinite(opacity) || opacity <= 0 || opacity > 1) return;
+    ctx.globalAlpha = alpha * opacity;
     ctx.fillStyle = annotation.color;
     if (annotation.kind === 'text') {
       if (!isFinitePoint(annotation) || !Number.isFinite(annotation.fontSize) || annotation.fontSize <= 0) return;
@@ -145,6 +148,12 @@ export class CanvasRenderer {
       return;
     }
     if (!Number.isFinite(annotation.width) || annotation.width <= 0) return;
+    if (annotation.kind === 'arrow') {
+      ctx.beginPath(); ctx.strokeStyle = annotation.color; ctx.lineWidth = annotation.width;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const [from, to] of arrowSegments(annotation)) { ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); }
+      ctx.stroke(); return;
+    }
     const points = finiteStrokePoints(annotation.points);
     if (points.length === 0) return;
     ctx.beginPath();
@@ -164,4 +173,13 @@ export class CanvasRenderer {
     });
     ctx.stroke();
   }
+}
+
+function annotationCost(annotation: Annotation): number {
+  return annotation.kind === 'stroke' ? annotation.points.length : annotation.kind === 'text' ? annotation.text.length : 2;
+}
+function snapshotAnnotation(annotation: Annotation): Annotation {
+  if (annotation.kind === 'stroke') return { ...annotation, points: annotation.points.map((p) => ({ ...p })) };
+  if (annotation.kind === 'arrow') return { ...annotation, start: { ...annotation.start }, end: { ...annotation.end } };
+  return { ...annotation };
 }

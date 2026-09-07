@@ -25,6 +25,15 @@ pub enum Annotation {
         points: Vec<Point>,
         color: String,
         width: f64,
+        #[serde(default = "opaque")]
+        opacity: f64,
+    },
+    Arrow {
+        id: String,
+        start: Point,
+        end: Point,
+        color: String,
+        width: f64,
     },
     Text {
         id: String,
@@ -39,7 +48,7 @@ pub enum Annotation {
 impl Annotation {
     pub fn id(&self) -> &str {
         match self {
-            Self::Stroke { id, .. } | Self::Text { id, .. } => id,
+            Self::Stroke { id, .. } | Self::Text { id, .. } | Self::Arrow { id, .. } => id,
         }
     }
     pub fn bytes(&self) -> usize {
@@ -47,6 +56,7 @@ impl Annotation {
             + match self {
                 Self::Stroke { points, .. } => points.len() * 16,
                 Self::Text { text, .. } => text.len(),
+                Self::Arrow { .. } => 32,
             }
     }
     pub fn validate(&self) -> Result<(), String> {
@@ -58,11 +68,28 @@ impl Annotation {
                 points,
                 color,
                 width,
+                opacity,
                 ..
             } => {
                 !points.is_empty()
                     && points.len() <= 100_000
                     && points.iter().all(|p| coordinate(p.x) && coordinate(p.y))
+                    && valid_color(color)
+                    && finite_range(*width, 1., 64.)
+                    && finite_range(*opacity, 0.1, 1.)
+            }
+            Self::Arrow {
+                start,
+                end,
+                color,
+                width,
+                ..
+            } => {
+                coordinate(start.x)
+                    && coordinate(start.y)
+                    && coordinate(end.x)
+                    && coordinate(end.y)
+                    && (end.x - start.x).hypot(end.y - start.y) >= 2.
                     && valid_color(color)
                     && finite_range(*width, 1., 32.)
             }
@@ -90,6 +117,15 @@ impl Annotation {
         }
     }
 }
+fn opaque() -> f64 {
+    1.
+}
+fn marker_width() -> f64 {
+    24.
+}
+fn marker_opacity() -> f64 {
+    0.32
+}
 fn coordinate(n: f64) -> bool {
     finite_range(n, -100_000., 100_000.)
 }
@@ -105,10 +141,16 @@ pub enum Tool {
     Pen,
     Eraser,
     Text,
+    Arrow,
+    Highlighter,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BrushSettings {
+    #[serde(default = "marker_width")]
+    pub highlighter_width: f64,
+    #[serde(default = "marker_opacity")]
+    pub highlighter_opacity: f64,
     pub tool: Tool,
     pub color: String,
     pub width: f64,
@@ -118,6 +160,8 @@ impl BrushSettings {
     pub fn from_defaults(settings: &AppSettings) -> Self {
         Self {
             tool: Tool::Pen,
+            highlighter_width: marker_width(),
+            highlighter_opacity: marker_opacity(),
             color: settings.color.clone(),
             width: settings.width,
             text_size: settings.text_size,
@@ -127,6 +171,8 @@ impl BrushSettings {
         if valid_color(&self.color)
             && finite_range(self.width, 1., 32.)
             && finite_range(self.text_size, 8., 144.)
+            && finite_range(self.highlighter_width, 8., 64.)
+            && finite_range(self.highlighter_opacity, 0.1, 0.8)
         {
             Ok(())
         } else {
@@ -137,6 +183,8 @@ impl BrushSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BrushPatch {
+    pub highlighter_width: Option<f64>,
+    pub highlighter_opacity: Option<f64>,
     pub tool: Option<Tool>,
     pub color: Option<String>,
     pub width: Option<f64>,
@@ -145,6 +193,10 @@ pub struct BrushPatch {
 impl BrushPatch {
     pub fn apply(self, current: &BrushSettings) -> BrushSettings {
         BrushSettings {
+            highlighter_width: self.highlighter_width.unwrap_or(current.highlighter_width),
+            highlighter_opacity: self
+                .highlighter_opacity
+                .unwrap_or(current.highlighter_opacity),
             tool: self.tool.unwrap_or(current.tool),
             color: self.color.unwrap_or_else(|| current.color.clone()),
             width: self.width.unwrap_or(current.width),
@@ -168,6 +220,8 @@ fn default_presets() -> Vec<BrushPreset> {
     .map(|(name, tool, color, width, text_size)| BrushPreset {
         name: name.into(),
         brush: BrushSettings {
+            highlighter_width: marker_width(),
+            highlighter_opacity: marker_opacity(),
             tool,
             color: color.into(),
             width,
@@ -561,8 +615,65 @@ impl SceneStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn arrow_and_highlighter_validation_and_legacy_defaults() {
+        let legacy = r##"{"kind":"stroke","id":"old","points":[{"x":1,"y":2}],"color":"#ffcf56","width":12}"##;
+        let annotation: Annotation = serde_json::from_str(legacy).unwrap();
+        annotation.validate().unwrap();
+        assert!(matches!(annotation, Annotation::Stroke { opacity: 1., .. }));
+        let marker: Annotation =
+            serde_json::from_str(&legacy.replace("12}", "64,\"opacity\":0.32}")).unwrap();
+        marker.validate().unwrap();
+        let mut bad = marker.clone();
+        if let Annotation::Stroke { opacity, .. } = &mut bad {
+            *opacity = f64::NAN;
+        }
+        assert!(bad.validate().is_err());
+        let arrow = Annotation::Arrow {
+            id: "arrow".into(),
+            start: Point { x: 10., y: 20. },
+            end: Point { x: 110., y: 20. },
+            color: "#ffcf56".into(),
+            width: 4.,
+        };
+        arrow.validate().unwrap();
+        let mut bad = arrow.clone();
+        if let Annotation::Arrow { end, .. } = &mut bad {
+            end.x = 10.;
+        }
+        assert!(bad.validate().is_err());
+        let mut scene = SceneStore::default();
+        scene.ensure("a");
+        scene
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: 0,
+                    added: vec![marker, arrow],
+                    removed_ids: vec![],
+                },
+                0,
+            )
+            .unwrap();
+        assert_eq!(scene.snapshot("a").unwrap().annotations.len(), 2);
+        scene.clear(350);
+        scene.undo();
+        assert_eq!(scene.snapshot("a").unwrap().annotations.len(), 2);
+    }
+    #[test]
+    fn old_presets_gain_marker_settings_and_reject_invisible_markers() {
+        let old = r##"{"tool":"pen","color":"#ffcf56","width":12,"textSize":28}"##;
+        let mut brush: BrushSettings = serde_json::from_str(old).unwrap();
+        assert_eq!(brush.highlighter_width, 24.);
+        assert_eq!(brush.highlighter_opacity, 0.32);
+        brush.tool = Tool::Highlighter;
+        brush.validate().unwrap();
+        brush.highlighter_opacity = 0.;
+        assert!(brush.validate().is_err());
+    }
     fn stroke(id: &str) -> Annotation {
         Annotation::Stroke {
+            opacity: 1.,
             id: id.into(),
             points: vec![Point { x: 1., y: 2. }],
             color: "#abcdef".into(),
@@ -668,6 +779,7 @@ mod tests {
         s.ensure("b");
         for i in 0..1000 {
             let annotation = Annotation::Stroke {
+                opacity: 1.,
                 id: i.to_string(),
                 points: (0..100)
                     .map(|x| Point {
