@@ -62,7 +62,7 @@
   </div>
 {/if}
 <style>
-  .toolbar-area { position: fixed; z-index: 10; user-select: none; max-width: calc(100vw - 20px); }
+  .toolbar-area { position: fixed; z-index: 10; user-select: none; width: max-content; max-width: calc(100vw - 20px); }
   .toolbar-popup { position: fixed; z-index: 11; overflow-y: auto; border-radius: 16px; box-shadow: 0 8px 24px #0004; }
   .toolbar :global(.toolbar-grip) { cursor: grab; touch-action: none; min-width: 22px; width: 22px; padding: 3px; color: #8d99ad; }
   .toolbar :global(.toolbar-grip:active) { cursor: grabbing; }
