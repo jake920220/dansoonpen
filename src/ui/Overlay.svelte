@@ -84,12 +84,12 @@
       if (pointer !== null && canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
       currentStroke = null; currentArrow = null; lastPoint = null; erased.clear();
       pendingAdds.clear(); pendingRemovals.clear();
-      textEntry = null; composing = false;
+      textEntry = null; textDrag = null; composing = false;
       renderer?.setPreview(null);
       duration ??= settings.reduceMotion ? 0 : 350;
     }
     scene = next;
-    if (textEntry?.original && !visibleAnnotations().some((a) => a.id === textEntry?.original?.id)) textEntry = null;
+    if (textEntry?.original && !visibleAnnotations().some((a) => a.id === textEntry?.original?.id)) { textEntry = null; textDrag = null; }
     renderScene();
     if (removed.length) renderer?.fadeOut(removed, duration ?? 0);
     if (cleared) reportDiagnostic('scene');
@@ -302,7 +302,7 @@
       const value = editor?.value ?? entry.value;
       if (textEntry !== entry || disposed) return;
       if (new TextEncoder().encode(value).length > 40_000) { error = '텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요.'; editor?.focus(); return; }
-      textEntry = null; composing = false;
+      textEntry = null; textDrag = null; composing = false;
       if (!textDraftChanged(entry, value)) { renderScene(); return; }
       const removed = entry.original ? [entry.original.id] : [];
       const annotation: TextAnnotation = { kind: 'text', id: entry.original?.id ?? crypto.randomUUID(), x: entry.x, y: entry.y, text: value, color: entry.color, fontSize: entry.fontSize };
