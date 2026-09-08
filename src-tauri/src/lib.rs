@@ -1,10 +1,12 @@
 mod cursor;
+mod diagnostics;
 mod model;
 mod platform;
 mod settings;
 mod shortcut_registry;
 
 use model::*;
+use serde_json::json;
 use std::{collections::HashSet, path::PathBuf, str::FromStr, sync::Mutex, time::Duration};
 use tauri::{
     menu::{Menu, MenuItem},
@@ -60,12 +62,26 @@ fn dispatch_native<F: FnOnce() + Send + 'static>(
 }
 async fn native_command<T: Send + 'static, F: FnOnce() -> Result<T, String> + Send + 'static>(
     app: tauri::AppHandle,
+    command: &'static str,
     work: F,
 ) -> Result<T, String> {
+    let verbose = !matches!(command, "apply_edit" | "update_brush" | "get_cursor");
+    let request = if verbose {
+        diagnostics::record(&app, "command.received", json!({"command": command}))
+    } else {
+        0
+    };
     tauri::async_runtime::spawn_blocking(move || {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let handle = app.clone();
         dispatch_native(&app, move || {
-            let _ = tx.send(work());
+            if verbose { diagnostics::record(&handle, "command.begin", json!({"command": command, "request": request})); }
+            let started = std::time::Instant::now();
+            let result = work();
+            if verbose || result.is_err() || started.elapsed() > Duration::from_millis(250) {
+                diagnostics::record(&handle, "command.end", json!({"command": command, "request": request, "ok": result.is_ok(), "elapsedMs": started.elapsed().as_millis()}));
+            }
+            let _ = tx.send(result);
         })?;
         rx.recv().map_err(|e| e.to_string())?
     })
@@ -144,6 +160,7 @@ fn ensure_overlay(
     let window = if let Some(w) = app.get_webview_window(&name) {
         w
     } else {
+        diagnostics::record(app, "overlay.create_begin", json!({"window": name}));
         let mut url =
             tauri::Url::parse("http://localhost/index.html").map_err(|e| e.to_string())?;
         url.query_pairs_mut()
@@ -168,6 +185,7 @@ fn ensure_overlay(
             .set_ignore_cursor_events(true)
             .map_err(|e| e.to_string())?;
         platform::configure_overlay(&window)?;
+        diagnostics::record(app, "overlay.created", json!({"window": name}));
         window
     };
     // Monitor coordinates are physical pixels. Frontend uses CSS/logical pixels.
@@ -177,6 +195,11 @@ fn ensure_overlay(
     window
         .set_position(PhysicalPosition::new(display.x, display.y))
         .map_err(|e| e.to_string())?;
+    diagnostics::record(
+        app,
+        "overlay.placement_requested",
+        json!({"window": name, "frameMayBePending":true, "target": {"x":display.x,"y":display.y,"width":display.width,"height":display.height,"scale":display.scale_factor}, "native":platform::window_diagnostics(&window).ok()}),
+    );
     Ok(window)
 }
 fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
@@ -184,10 +207,20 @@ fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
     for (name, w) in app.webview_windows() {
         if name.starts_with("overlay-") {
             if let Err(e) = w.set_ignore_cursor_events(true) {
+                diagnostics::record(
+                    app,
+                    "window.input_release_failed",
+                    json!({"window":name, "step":"ignore_cursor"}),
+                );
                 errors.push(e.to_string());
                 let _ = w.hide();
             }
             if let Err(e) = w.set_focusable(false) {
+                diagnostics::record(
+                    app,
+                    "window.input_release_failed",
+                    json!({"window":name, "step":"focusable"}),
+                );
                 errors.push(e.to_string());
                 let _ = w.hide();
             }
@@ -203,7 +236,9 @@ fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
     }
 }
 fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> Result<(), String> {
+    diagnostics::record(app, "mode.begin", json!({"from":data.app.mode,"to":mode}));
     let result = (|| {
+        diagnostics::record(app, "mode.step", json!({"step":"release_inputs"}));
         release_inputs(app)?;
         if mode == Mode::Draw {
             let id = data
@@ -215,13 +250,17 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             if data.app.mode != Mode::Draw {
                 data.previous_focus.capture();
             }
+            diagnostics::record(app, "mode.step", json!({"step":"show"}));
             window.show().map_err(|e| e.to_string())?;
+            diagnostics::record(app, "mode.step", json!({"step":"enable_input"}));
             window.set_focusable(true).map_err(|e| e.to_string())?;
             window
                 .set_ignore_cursor_events(false)
                 .map_err(|e| e.to_string())?;
+            diagnostics::record(app, "mode.step", json!({"step":"focus"}));
             window.set_focus().map_err(|e| e.to_string())?;
         } else {
+            diagnostics::record(app, "mode.step", json!({"step":"restore_previous_focus"}));
             data.previous_focus.restore()?;
         }
         Ok::<_, String>(())
@@ -234,6 +273,8 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             }
             data.app.error = None;
             emit_state(app, data);
+            diagnostics::state(app, data, "mode_complete");
+            diagnostics::windows(app, "mode_complete");
             Ok(())
         }
         Err(e) => {
@@ -242,6 +283,8 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             data.app.mode = Mode::Interact;
             data.app.error = Some(e.clone());
             emit_state(app, data);
+            diagnostics::state(app, data, "mode_failed");
+            diagnostics::windows(app, "mode_failed");
             Err(e)
         }
     }
@@ -266,7 +309,7 @@ fn toggle_cursor_highlight(app: &tauri::AppHandle, data: &mut RuntimeState) -> R
 }
 #[tauri::command]
 async fn toggle_cursor(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "toggle_cursor", move || {
         authorized(&window)?;
         let state = lock(&app);
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
@@ -279,7 +322,7 @@ async fn get_cursor(
     window: WebviewWindow,
     app: tauri::AppHandle,
 ) -> Result<Option<cursor::Frame>, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "get_cursor", move || {
         authorized(&window)?;
         let state = lock(&app);
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
@@ -289,6 +332,11 @@ async fn get_cursor(
     .await
 }
 fn toggle_visibility(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    diagnostics::record(
+        app,
+        "annotations.toggle",
+        json!({"from":data.app.annotations_visible}),
+    );
     data.app.annotations_visible = !data.app.annotations_visible;
     // Hiding exits drawing; restoring never steals focus or changes history.
     if !data.app.annotations_visible && data.app.mode == Mode::Draw {
@@ -300,7 +348,7 @@ fn toggle_visibility(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<
 }
 #[tauri::command]
 async fn toggle_annotations(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "toggle_annotations", move || {
         authorized(&window)?;
         let state = lock(&app);
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
@@ -317,6 +365,11 @@ fn clear_scope_and_interact(
     display: Option<String>,
 ) -> Result<(), String> {
     let duration = fade(data);
+    diagnostics::record(
+        app,
+        "clear.begin",
+        json!({"scope":display.as_deref().map(label), "all":display.is_none(), "mode":data.app.mode, "fadeMs":duration}),
+    );
     // Advance the clear generation before mode-exit handlers can submit a final edit.
     // Keep the overlay visible so its existing fade can finish after input is released.
     let updates = if let Some(id) = display {
@@ -328,9 +381,12 @@ fn clear_scope_and_interact(
     if data.app.mode == Mode::Draw {
         change_mode(app, data, Mode::Interact)?;
     }
+    diagnostics::state(app, data, "clear_complete");
+    diagnostics::record(app, "clear.end", json!({"ok":true}));
     Ok(())
 }
 fn report(app: &tauri::AppHandle, data: &mut RuntimeState, error: String) {
+    diagnostics::record(app, "runtime.error", json!({"mode":data.app.mode}));
     data.app.error = Some(error);
     emit_state(app, data);
 }
@@ -385,8 +441,17 @@ fn replace_shortcuts(
                 .map_err(|e| e.to_string())
         }
     }
+    let requested: Vec<_> = wanted
+        .iter()
+        .map(|s| json!({"id":s.id(),"binding":s.to_string()}))
+        .collect();
     let result = shortcut_registry::replace(&mut NativeRegistry(app), &mut data.registered, wanted);
     data.pressed.clear();
+    diagnostics::record(
+        app,
+        "shortcuts.registration",
+        json!({"ok":result.is_ok(), "requested":requested, "registeredIds":data.registered.iter().map(|s|s.id()).collect::<Vec<_>>()}),
+    );
     result
 }
 fn refresh_displays(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
@@ -427,6 +492,7 @@ fn refresh_displays(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(
         return Ok(());
     }
     data.app.displays = next;
+    diagnostics::state(app, data, "displays_changed");
     let active_connected = data
         .app
         .active_display_id
@@ -462,12 +528,13 @@ fn refresh_displays(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(
         }
     }
     emit_state(app, data);
+    diagnostics::windows(app, "displays_changed");
     Ok(())
 }
 
 #[tauri::command]
 async fn get_state(window: WebviewWindow, app: tauri::AppHandle) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "get_state", move || {
         authorized(&window)?;
         Ok(lock(&app).0.lock().map_err(|e| e.to_string())?.app.clone())
     })
@@ -479,7 +546,7 @@ async fn set_mode(
     app: tauri::AppHandle,
     mode: Mode,
 ) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "set_mode", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -494,7 +561,7 @@ async fn select_display(
     app: tauri::AppHandle,
     display_id: String,
 ) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "select_display", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -519,7 +586,7 @@ async fn update_settings(
     app: tauri::AppHandle,
     settings: SettingsPatch,
 ) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "update_settings", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -568,7 +635,7 @@ async fn update_brush(
     app: tauri::AppHandle,
     brush: BrushPatch,
 ) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "update_brush", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -588,7 +655,7 @@ async fn update_preset(
     name: Option<String>,
     brush: Option<BrushSettings>,
 ) -> Result<AppState, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "update_preset", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -617,7 +684,7 @@ async fn capture_shortcut(
     app: tauri::AppHandle,
     active: bool,
 ) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "capture_shortcut", move || {
         control_only(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -640,7 +707,7 @@ async fn get_scene(
     app: tauri::AppHandle,
     display_id: String,
 ) -> Result<SceneSnapshot, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "get_scene", move || {
         authorized(&window)?;
         if window.label() != "control" && window.label() != label(&display_id) {
             return Err("다른 화면의 장면을 요청할 수 없습니다.".into());
@@ -660,7 +727,7 @@ async fn apply_edit(
     app: tauri::AppHandle,
     edit: SceneEdit,
 ) -> Result<SceneSnapshot, String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "apply_edit", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -679,7 +746,7 @@ async fn apply_edit(
 }
 #[tauri::command]
 async fn clear_all(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "clear_all", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -689,7 +756,7 @@ async fn clear_all(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), S
 }
 #[tauri::command]
 async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "clear_current", move || {
         authorized(&window)?;
         let state = lock(&app);
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
@@ -704,7 +771,7 @@ async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(
 }
 #[tauri::command]
 async fn undo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "undo", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -715,7 +782,7 @@ async fn undo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
 }
 #[tauri::command]
 async fn redo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "redo", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
@@ -743,7 +810,7 @@ fn open_control(app: &tauri::AppHandle) -> Result<(), String> {
 }
 #[tauri::command]
 async fn show_control(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "show_control", move || {
         authorized(&window)?;
         open_control(&app)
     })
@@ -751,7 +818,7 @@ async fn show_control(window: WebviewWindow, app: tauri::AppHandle) -> Result<()
 }
 #[tauri::command]
 async fn quit_app(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native_command(app.clone(), move || {
+    native_command(app.clone(), "quit_app", move || {
         control_only(&window)?;
         let _ = release_inputs(&app);
         app.exit(0);
@@ -821,8 +888,10 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             let handle = app.clone();
             let event_id = event.id.as_ref().to_string();
+            diagnostics::record(app, "tray.received", json!({"action":event_id}));
             let _ = dispatch_native(app, move || {
                 let app = &handle;
+                diagnostics::record(app, "tray.begin", json!({"action":event_id}));
 
                 if event_id.as_str() == "quit" {
                     let _ = release_inputs(app);
@@ -887,8 +956,12 @@ fn tray_pixels() -> Vec<u8> {
 
 pub fn run() {
     tauri::Builder::default()
+        .on_page_load(|webview, payload| {
+            diagnostics::record(webview.app_handle(), "webview.page_load", json!({"window":webview.label(),"stage":format!("{:?}",payload.event())}));
+        })
         .on_menu_event(|app, event| {
             if event.id.as_ref() == "open-settings" {
+                diagnostics::record(app, "menu.received", json!({"action":"open_settings"}));
                 let handle = app.clone();
                 let _ = dispatch_native(app, move || {
                     let _ = open_control(&handle);
@@ -901,22 +974,28 @@ pub fn run() {
                     let handle = app.clone();
                     let id = key.id();
                     let pressed = event.state == ShortcutState::Pressed;
+                    let received = diagnostics::record(app, "shortcut.received", json!({"id":id,"pressed":pressed}));
                     let _ = dispatch_native(app, move || {
+                        diagnostics::record(&handle, "shortcut.dispatched", json!({"received":received,"id":id,"pressed":pressed}));
                         let state = lock(&handle);
                         if let Ok(mut d) = state.0.lock() {
                             if !pressed {
                                 d.pressed.remove(&id);
+                                diagnostics::record(&handle, "shortcut.released", json!({"received":received,"id":id}));
                                 return;
                             }
                             if d.capturing_shortcut {
+                                diagnostics::record(&handle, "shortcut.ignored", json!({"received":received,"reason":"capture"}));
                                 return;
                             }
                             if !d.pressed.insert(id) {
+                                diagnostics::record(&handle, "shortcut.ignored", json!({"received":received,"reason":"repeat"}));
                                 return;
                             }
                             if Shortcut::from_str(&d.app.settings.toggle_shortcut)
                                 .is_ok_and(|s| s.id() == id)
                             {
+                                diagnostics::record(&handle, "shortcut.action", json!({"received":received,"action":"toggle"}));
                                 let next = if d.app.mode == Mode::Draw {
                                     Mode::Interact
                                 } else {
@@ -926,10 +1005,12 @@ pub fn run() {
                             } else if Shortcut::from_str(&d.app.settings.clear_shortcut)
                                 .is_ok_and(|s| s.id() == id)
                             {
+                                diagnostics::record(&handle, "shortcut.action", json!({"received":received,"action":"clear"}));
                                 let _ = clear_and_interact(&handle, &mut d);
                             } else if Shortcut::from_str(&d.app.settings.visibility_shortcut)
                                 .is_ok_and(|s| s.id() == id)
                             {
+                                diagnostics::record(&handle, "shortcut.action", json!({"received":received,"action":"visibility"}));
                                 let _ = toggle_visibility(&handle, &mut d);
                             }
                         };
@@ -955,9 +1036,28 @@ pub fn run() {
             undo,
             redo,
             show_control,
-            quit_app
+            quit_app,
+            diagnostics::record_diagnostic
         ])
         .setup(|app| {
+            match app.path().app_log_dir().map(|p| p.join("diagnostics")) {
+                Ok(path) => match diagnostics::Diagnostics::start(path) {
+                    Ok(log) => {
+                        log.record("session.start", json!({"version":env!("CARGO_PKG_VERSION"),"os":std::env::consts::OS,"arch":std::env::consts::ARCH}));
+                        app.manage(log);
+                    }
+                    Err(_) => eprintln!("My Brush: local diagnostics unavailable; drawing continues."),
+                },
+                Err(_) => eprintln!("My Brush: diagnostics directory unavailable; drawing continues."),
+            }
+            let previous_panic = std::panic::take_hook();
+            let panic_app = app.handle().clone();
+            std::panic::set_hook(Box::new(move |info| {
+                // A panic message can contain user input; record location only.
+                diagnostics::record(&panic_app, "runtime.panic", json!({"line":info.location().map(|l|l.line())}));
+                if let Some(log) = panic_app.try_state::<diagnostics::Diagnostics>() { log.flush(); }
+                previous_panic(info);
+            }));
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let path = app.path().app_config_dir()?.join("settings.json");
@@ -1044,6 +1144,7 @@ pub fn run() {
                 emit_state(app.handle(), &mut d);
             }
             let handle = app.handle().clone();
+            diagnostics::start_watchdog(handle.clone());
             std::thread::spawn(move || loop {
                 std::thread::sleep(Duration::from_secs(3));
                 let inner = handle.clone();
@@ -1066,6 +1167,18 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            let detail = match event {
+                tauri::WindowEvent::Focused(focused) => Some(json!({"type":"focused","focused":focused})),
+                tauri::WindowEvent::Resized(size) => Some(json!({"type":"resized","width":size.width,"height":size.height})),
+                tauri::WindowEvent::Moved(position) => Some(json!({"type":"moved","x":position.x,"y":position.y})),
+                tauri::WindowEvent::ScaleFactorChanged { scale_factor, new_inner_size, .. } => Some(json!({"type":"scale","scale":scale_factor,"width":new_inner_size.width,"height":new_inner_size.height})),
+                tauri::WindowEvent::CloseRequested { .. } => Some(json!({"type":"close_requested"})),
+                tauri::WindowEvent::Destroyed => Some(json!({"type":"destroyed"})),
+                _ => None,
+            };
+            if let Some(detail) = detail {
+                diagnostics::record(window.app_handle(), "window.event", json!({"window":window.label(),"detail":detail}));
+            }
             if window.label() == "control" {
                 if matches!(
                     event,
@@ -1086,8 +1199,14 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("My Brush 실행에 실패했습니다");
+        .build(tauri::generate_context!())
+        .expect("My Brush 실행에 실패했습니다")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                diagnostics::record(app, "session.exit", json!({}));
+                if let Some(log) = app.try_state::<diagnostics::Diagnostics>() { log.flush(); }
+            }
+        });
 }
 
 #[cfg(test)]

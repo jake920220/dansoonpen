@@ -42,6 +42,19 @@ pub fn configure_overlay(window: &WebviewWindow) -> Result<(), String> {
     ns.setHidesOnDeactivate(false);
     Ok(())
 }
+pub fn window_diagnostics(window: &WebviewWindow) -> Result<serde_json::Value, String> {
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    // Metadata only; caller must be on the AppKit main thread. Never capture screen contents.
+    let ns = unsafe { &*raw.cast::<NSWindow>() };
+    let frame = ns.frame();
+    Ok(serde_json::json!({
+        "framePoints": {"x":frame.origin.x,"y":frame.origin.y,"width":frame.size.width,"height":frame.size.height},
+        "coordinateSystem":"appkit_bottom_left_points", "scale":ns.backingScaleFactor(),
+        "visible":ns.isVisible(), "key":ns.isKeyWindow(), "canBecomeKey":ns.canBecomeKeyWindow(),
+        "ignoresMouse":ns.ignoresMouseEvents(), "opaque":ns.isOpaque(), "alpha":ns.alphaValue(),
+        "level":ns.level(), "onActiveSpace":ns.isOnActiveSpace(), "occlusion":ns.occlusionState().bits(),
+    }))
+}
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Point {

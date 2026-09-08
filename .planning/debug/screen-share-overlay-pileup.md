@@ -10,12 +10,12 @@ updated: 2026-09-08
 hypothesis: incident trigger remains unknown; one overlay page weakens window multiplication. Confirmed adjacent risks are target/current DPI conversion, nonfocusable show warnings, and macOS non-exclusive shortcut registrations
 test: correlate user's exact visual symptom, sharing app and display/key actions with existing lifecycle logs; native reproduction must be a later controlled step
 expecting: distinguish compositor ghosting or share-preview feedback from actual window growth, then select a falsifiable incident hypothesis
-next_action: parent obtains missing symptom details; do not relaunch or mutate the app while waiting. No product fix has been made
+next_action: user authorized bounded persistent diagnostics for recurrence. Add command/window/watchdog metadata and frontend liveness/context signals; root cause remains unconfirmed. No speculative focus/geometry fix.
 
 ## Symptoms
 
 expected: One stable overlay per display during screen sharing and drawing; ink remains until explicit deletion.
-actual: During a lecture and screen sharing, many overlays/visual layers appeared suddenly; the user quit the app.
+actual: The entire display was covered by a black/gray overlay. Alt+X did not dismiss it and Alt+Z did not change state; the user quit the app. Multiple actual windows are not established.
 errors: No error text reported.
 reproduction: Exact sharing application, display topology, key sequence and visual appearance pending.
 started: Reported during real lecture using installed v0.3; no deterministic reproduction yet.

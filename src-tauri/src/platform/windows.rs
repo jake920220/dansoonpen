@@ -37,6 +37,12 @@ impl PreviousFocus {
 pub fn configure_overlay(_window: &WebviewWindow) -> Result<(), String> {
     Ok(())
 }
+pub fn window_diagnostics(window: &WebviewWindow) -> Result<serde_json::Value, String> {
+    Ok(serde_json::json!({
+        "positionPhysical":window.outer_position().ok(), "sizePhysical":window.outer_size().ok(),
+        "scale":window.scale_factor().ok(), "visible":window.is_visible().ok(), "focused":window.is_focused().ok(),
+    }))
+}
 pub fn display_identity(monitor: &tauri::Monitor) -> String {
     format!(
         "win-{}",

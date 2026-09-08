@@ -11,6 +11,7 @@
   import ColorPalette from './ColorPalette.svelte';
   import { SettingsWriter } from '../app/settings-writer';
   import { canvasKey, isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
+  import { observeCanvasDiagnostics, opaqueBackground, registerDiagnosticMetrics, reportDiagnostic } from '../app/diagnostics';
 
   let { displayId }: { displayId: string } = $props();
   let canvas: HTMLCanvasElement;
@@ -55,6 +56,7 @@
   function renderScene() { const annotations = visibleAnnotations(); renderer?.setScene(annotations); annotationCount = annotations.length; }
   function acceptScene(next: SceneSnapshot, removed: Annotation[] = [], duration?: number) {
     if (next.displayId !== displayId || next.revision < scene.revision) return;
+    const cleared = next.clearGeneration > scene.clearGeneration && scene.revision >= 0;
     if (next.clearGeneration > scene.clearGeneration && scene.revision >= 0) {
       const visible = visibleAnnotations();
       if (currentStroke) visible.push(currentStroke);
@@ -73,6 +75,7 @@
     scene = next;
     renderScene();
     if (removed.length) renderer?.fadeOut(removed, duration ?? 0);
+    if (cleared) reportDiagnostic('scene');
   }
   function acceptUpdate(update: SceneUpdate) {
     if (update.scene.displayId !== displayId || update.scene.revision <= scene.revision) return;
@@ -80,16 +83,28 @@
   }
   function acceptState(next: AppState) {
     if (appState && next.revision < appState.revision) return;
+    const changedMode = !appState || appState.mode !== next.mode || appState.activeDisplayId !== next.activeDisplayId;
     const leaving = drawing && (next.mode !== 'draw' || next.activeDisplayId !== displayId);
     if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
     appState = next;
     localWidth = optimisticBrush.width ?? next.brush.width;
     localTextSize = optimisticBrush.textSize ?? next.brush.textSize;
+    if (changedMode) reportDiagnostic('state');
   }
   function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); }
   onMount(() => {
     const unlisteners: (() => void)[] = [];
-    try { renderer = new CanvasRenderer(canvas); resize(); } catch (e) { error = message(e); }
+    const stopMetrics = registerDiagnosticMetrics(() => ({
+      mode: appState?.mode,
+      revision: appState?.revision,
+      sceneRevision: scene.revision >= 0 ? scene.revision : undefined,
+      annotationCount,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      opaqueBackground: opaqueBackground(document.documentElement, document.body, document.getElementById('app'), canvas),
+    }));
+    const stopContextDiagnostics = observeCanvasDiagnostics(canvas, reportDiagnostic);
+    try { renderer = new CanvasRenderer(canvas); resize(); } catch (e) { error = message(e); reportDiagnostic('error'); }
     void (async () => {
       try {
         for (const promise of [bridge.onState(acceptState), bridge.onScene(acceptUpdate)]) {
@@ -97,10 +112,10 @@
           if (disposed) off(); else unlisteners.push(off);
         }
         const [initialState, initialScene] = await Promise.all([bridge.getState(), bridge.getScene(displayId)]);
-        if (!disposed) { acceptState(initialState); acceptScene(initialScene); }
-      } catch (e) { if (!disposed) error = message(e); }
+        if (!disposed) { acceptState(initialState); acceptScene(initialScene); reportDiagnostic('ready'); }
+      } catch (e) { if (!disposed) { error = message(e); reportDiagnostic('error'); } }
     })();
-    return () => { disposed = true; unlisteners.forEach((off) => off()); void settingsWriter.flush(); void brushWriter.flush(); renderer?.dispose(); };
+    return () => { disposed = true; stopMetrics(); stopContextDiagnostics(); unlisteners.forEach((off) => off()); void settingsWriter.flush(); void brushWriter.flush(); renderer?.dispose(); };
   });
   function submit(added: Annotation[], removedIds: string[]) {
     if (!added.length && !removedIds.length) return;
