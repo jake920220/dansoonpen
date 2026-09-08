@@ -786,6 +786,74 @@ mod tests {
         }
     }
     #[test]
+    fn text_position_and_style_are_one_undoable_replacement() {
+        let mut store = SceneStore::default();
+        store.ensure("a");
+        let old = text_note("text", "내용 유지");
+        store
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: 0,
+                    added: vec![old.clone()],
+                    removed_ids: vec![],
+                },
+                350,
+            )
+            .unwrap();
+        let mut changed = old.clone();
+        if let Annotation::Text {
+            x,
+            y,
+            color,
+            font_size,
+            ..
+        } = &mut changed
+        {
+            *x = 200.;
+            *y = 300.;
+            *color = "#57d9c6".into();
+            *font_size = 64.;
+        }
+        let updates = store
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: 0,
+                    added: vec![changed.clone()],
+                    removed_ids: vec!["text".into()],
+                },
+                350,
+            )
+            .unwrap();
+        assert!(updates[0].fade_out.is_empty());
+        assert_eq!(store.snapshot("a").unwrap().annotations.len(), 1);
+        store.undo();
+        assert_eq!(
+            serde_json::to_value(&store.snapshot("a").unwrap().annotations[0]).unwrap(),
+            serde_json::to_value(&old).unwrap()
+        );
+        store.redo(350);
+        assert_eq!(
+            serde_json::to_value(&store.snapshot("a").unwrap().annotations[0]).unwrap(),
+            serde_json::to_value(&changed).unwrap()
+        );
+        store.clear(350);
+        assert!(store
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: 0,
+                    added: vec![changed],
+                    removed_ids: vec!["text".into()]
+                },
+                350
+            )
+            .unwrap()
+            .is_empty());
+        assert!(store.snapshot("a").unwrap().annotations.is_empty());
+    }
+    #[test]
     fn text_replacement_keeps_its_layer_and_undo_redo_without_ghost_fade() {
         let mut s = SceneStore::default();
         s.ensure("a");

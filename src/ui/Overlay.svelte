@@ -11,6 +11,7 @@
   import ColorPalette from './ColorPalette.svelte';
   import SizeControl from './SizeControl.svelte';
   import { toolSize, sizePatch, stepSize } from '../shared/tool-size';
+  import { constrainTextEditor, textDraftChanged, type TextDraft } from './text-edit';
   import { SettingsWriter } from '../app/settings-writer';
   import { canvasKey, isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
   import { observeCanvasDiagnostics, opaqueBackground, registerDiagnosticMetrics, reportDiagnostic } from '../app/diagnostics';
@@ -26,7 +27,9 @@
   let localWidth = $state(DEFAULT_SETTINGS.width);
   let localTextSize = $state(DEFAULT_SETTINGS.textSize);
   let annotationCount = $state(0);
-  let textEntry = $state<{ x: number; y: number; value: string; color: string; fontSize: number; original?: TextAnnotation } | null>(null);
+  let textEntry = $state<TextDraft | null>(null);
+  let textEditor = $state<HTMLDivElement>();
+  let textDrag: { pointer: number; start: Point; origin: Point; entry: TextDraft } | null = null;
   let composing = false;
   let compositionEndedAt = 0;
   let scene: SceneSnapshot = { displayId: '', revision: -1, clearGeneration: 0, annotations: [] };
@@ -48,6 +51,7 @@
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
   let brush = $derived({ ...(appState?.brush ?? defaultBrush(DEFAULT_SETTINGS)), ...optimisticBrush });
   let tool = $derived(brush.tool);
+  let editingBrush = $derived(textEntry ? { ...brush, color: textEntry.color, textSize: textEntry.fontSize } : brush);
   let activeWidth = $derived(tool === 'highlighter' ? brush.highlighterWidth : tool === 'eraser' ? brush.eraserSize : localWidth);
   let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
 
@@ -105,7 +109,7 @@
     localTextSize = optimisticBrush.textSize ?? next.brush.textSize;
     if (changedMode) reportDiagnostic('state');
   }
-  function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); }
+  function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); if (textEntry) placeText(textEntry); }
   onMount(() => {
     const unlisteners: (() => void)[] = [];
     const stopMetrics = registerDiagnosticMetrics(() => ({
@@ -249,11 +253,38 @@
     textarea?.focus();
     if (original) textarea?.setSelectionRange(original.text.length, original.text.length);
   }
-  function cancelText() { textEntry = null; composing = false; renderScene(); }
+  function cancelText() { textEntry = null; textDrag = null; composing = false; renderScene(); }
+  function placeText(point: Point) {
+    if (!textEntry) return;
+    const bounds = textEditor?.getBoundingClientRect();
+    const next = constrainTextEditor(point, bounds?.width ?? editorWidth(), bounds?.height ?? 140, { width: innerWidth, height: innerHeight });
+    textEntry.x = next.x; textEntry.y = next.y;
+  }
+  function startTextMove(event: PointerEvent) {
+    if (event.button !== 0 || !textEntry || textDrag) return;
+    textDrag = { pointer: event.pointerId, start: point(event), origin: { x: textEntry.x, y: textEntry.y }, entry: textEntry };
+    (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  function moveText(event: PointerEvent) {
+    if (!textDrag || textDrag.pointer !== event.pointerId || textDrag.entry !== textEntry) return;
+    placeText({ x: textDrag.origin.x + event.clientX - textDrag.start.x, y: textDrag.origin.y + event.clientY - textDrag.start.y });
+  }
+  function endTextMove(event: PointerEvent) { if (textDrag?.pointer === event.pointerId) textDrag = null; }
+  function textMoveKey(event: KeyboardEvent) {
+    const directions: Record<string, Point> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } };
+    const delta = directions[event.key];
+    if (!delta || !textEntry || event.isComposing) return;
+    event.preventDefault(); event.stopPropagation(); const step = event.shiftKey ? 10 : 1;
+    placeText({ x: textEntry.x + delta.x * step, y: textEntry.y + delta.y * step });
+  }
+  function changeColor(color: string) { if (textEntry) textEntry.color = color; else updateBrush({ color }); }
+
   function editorWidth() {
     if (!textEntry) return 440;
     const sample: TextAnnotation = { kind: 'text', id: '', text: textEntry.value, ...textEntry };
-    const width = Math.max(440, ...textLineBounds(sample).map((line) => line.width + 4));
+    const width = Math.max(textEntry.value ? 160 : 440, ...textLineBounds(sample).map((line) => line.width + 4));
     return Math.max(140, Math.min(width, innerWidth - textEntry.x - 10));
   }
   function commitText(): Promise<void> {
@@ -271,7 +302,7 @@
       if (textEntry !== entry || disposed) return;
       if (new TextEncoder().encode(value).length > 40_000) { error = '텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요.'; editor?.focus(); return; }
       textEntry = null; composing = false;
-      if (entry.original && value === entry.original.text) { renderScene(); return; }
+      if (!textDraftChanged(entry, value)) { renderScene(); return; }
       const removed = entry.original ? [entry.original.id] : [];
       const annotation: TextAnnotation = { kind: 'text', id: entry.original?.id ?? crypto.randomUUID(), x: entry.x, y: entry.y, text: value, color: entry.color, fontSize: entry.fontSize };
       submit(value.trim() ? [annotation] : [], removed);
@@ -306,7 +337,11 @@
     try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
     catch (e) { error = message(e); }
   }
-  function setSize(value: number) { updateBrush(sizePatch(tool, value)); }
+  function setSize(value: number) {
+    const patch = sizePatch(tool, value);
+    if (textEntry && patch.textSize !== undefined) textEntry.fontSize = patch.textSize;
+    else updateBrush(patch);
+  }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
     if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
@@ -332,8 +367,8 @@
     const tools: Record<string, Tool> = { p: 'pen', e: 'eraser', t: 'text', a: 'arrow', h: 'highlighter' };
     if (key === 'c') { event.preventDefault(); void action(bridge.toggleCursor); }
     else if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
-    else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
-    else if (key === '[' || key === ']') { event.preventDefault(); updateBrush(stepSize(brush, key === ']' ? 1 : -1)); }
+    else if (/^[1-6]$/.test(key)) { event.preventDefault(); changeColor(settings.quickColors[Number(key) - 1]); }
+    else if (key === '[' || key === ']') { event.preventDefault(); const patch = stepSize(editingBrush, key === ']' ? 1 : -1); setSize(toolSize({ ...editingBrush, ...patch })); }
   }
   function textKey(event: KeyboardEvent) {
     if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
@@ -361,7 +396,7 @@
         <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
-      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="current-size">{toolSize(brush)}px</span></button>
+      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={editingBrush.color}></span><span class="current-size">{toolSize(editingBrush)}px</span></button>
       <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
         {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
       </div>
@@ -380,11 +415,11 @@
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     {#snippet panel()}
       <div class="palette-panel">
-        {#if tool !== 'eraser'}<div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{brush.color.toUpperCase()}</code></div>
-        <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />{/if}
-        <SizeControl {tool} value={toolSize(brush)} color={brush.color} opacity={brush.highlighterOpacity} onchange={setSize} />
+        {#if tool !== 'eraser'}<div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{editingBrush.color.toUpperCase()}</code></div>
+        <ColorPalette value={editingBrush.color} colors={settings.quickColors} onchange={changeColor} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />{/if}
+        <SizeControl {tool} value={toolSize(editingBrush)} color={editingBrush.color} opacity={brush.highlighterOpacity} onchange={setSize} />
         {#if tool === 'highlighter'}<label class="palette-range"><span>불투명도</span><input aria-label="형광펜 불투명도" type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
-        <div class="brush-reset"><span>현재 도구에만 적용됩니다.</span><button onclick={resetBrush}>기본 펜으로</button></div>
+        <div class="brush-reset"><span>{textEntry ? '편집 중인 글에 적용됩니다.' : '현재 도구에만 적용됩니다.'}</span><button onclick={resetBrush}>기본 펜으로</button></div>
         <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>
         {#if presetStatus}<p role="status">{presetStatus}</p>{/if}
         <p>1–6 색상 · [ ] 굵기 · Shift+1–3 프리셋</p>
@@ -397,8 +432,13 @@
 {/if}
 
 {#if textEntry}
-  <div class="text-editor" style:left={`${textEntry.x}px`} style:top={`${textEntry.y}px`}>
+  <div bind:this={textEditor} class="text-editor" style:width={`${editorWidth()}px`} style:left={`${textEntry.x}px`} style:top={`${textEntry.y}px`}>
+    <div class="text-editor-heading"><button aria-label="텍스트 이동" title="드래그 또는 방향키로 이동 · Shift+방향키 10px" onpointerdown={startTextMove} onpointermove={moveText} onpointerup={endTextMove} onpointercancel={endTextMove} onlostpointercapture={endTextMove} onkeydown={textMoveKey}><Icon name="grip" size={15} />드래그로 이동</button><span>{textEntry.original ? '텍스트 수정' : '새 텍스트'}</span></div>
     <textarea bind:this={textarea} bind:value={textEntry.value} aria-label="화면에 입력할 텍스트" placeholder="텍스트 입력" wrap="off" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:width={`${editorWidth()}px`} style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
+    <div class="text-format" aria-label="편집 중인 텍스트 서식">
+      <div class="text-format-colors">{#each settings.quickColors as color}<button aria-label={`텍스트 색상 ${color}`} aria-pressed={textEntry.color === color} class:chosen={textEntry.color === color} style:background={color} onclick={() => changeColor(color)}></button>{/each}</div>
+      <label>크기 <input aria-label="편집 중인 글자 크기" type="number" min="8" max="144" step="2" value={textEntry.fontSize} oninput={(e) => { const n = Number(e.currentTarget.value); if (n >= 8 && n <= 144) setSize(n); }} onchange={(e) => { if (textEntry) { setSize(Number(e.currentTarget.value) || textEntry.fontSize); e.currentTarget.value = String(textEntry.fontSize); } }} /><span>px</span></label>
+    </div>
     <div class="text-editor-actions"><span>{textEntry.original ? '수정 중 · ' : ''}Enter 완료 · Shift+Enter 줄바꿈 · Esc 취소</span><button aria-label="텍스트 취소" onclick={cancelText}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label="텍스트 완료" onclick={commitText}><Icon name="check" size={16} />완료</button></div>
   </div>
 {/if}
