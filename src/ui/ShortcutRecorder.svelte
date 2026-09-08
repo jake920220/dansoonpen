@@ -40,7 +40,7 @@
 <svelte:window onblur={() => { if (focused) blur(); }} onfocus={() => { if (input === document.activeElement) void focus(); }} />
 <div class="shortcut-recorder">
   <input bind:this={input} {id} class="shortcut-input" class:recording={focused} readonly autocomplete="off" spellcheck="false"
-    aria-describedby={`${id}-hint`} value={focused ? candidate ? shortcutLabel(candidate) : ready ? '단축키를 눌러 주세요' : '입력 준비 중…' : shortcutLabel(value)}
+    aria-describedby={`${id}-hint`} value={focused ? candidate ? shortcutLabel(candidate) : ready ? '단축키를 눌러 주세요' : '입력 준비 중…' : value ? shortcutLabel(value) : '지정하지 않음'}
     onfocus={() => void focus()} onblur={blur} onkeydown={keydown} onkeyup={keyup} />
   <span id={`${id}-hint`} class="recorder-hint">{focused ? hint || 'Esc 취소 · Tab 이동' : '클릭하여 단축키 입력'}</span>
 </div>

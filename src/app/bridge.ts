@@ -27,6 +27,7 @@ export const bridge = {
   captureShortcut: (active: boolean) => call<void>('capture_shortcut', { active }),
   getScene: (displayId: string) => call<SceneSnapshot>('get_scene', { displayId }),
   applyEdit: (edit: SceneEdit) => call<SceneSnapshot>('apply_edit', { edit }),
+  toggleAnnotations: () => call<void>('toggle_annotations'),
   clearAll: () => call<void>('clear_all'),
   undo: () => call<void>('undo'),
   redo: () => call<void>('redo'),

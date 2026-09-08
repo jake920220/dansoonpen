@@ -242,7 +242,17 @@ pub struct AppSettings {
     pub quick_colors: Vec<String>,
     pub toggle_shortcut: String,
     pub clear_shortcut: String,
+    #[serde(default = "visibility_shortcut")]
+    pub visibility_shortcut: String,
     pub reduce_motion: bool,
+}
+fn visibility_shortcut() -> String {
+    if cfg!(target_os = "macos") {
+        "Alt+V"
+    } else {
+        "Alt+Shift+V"
+    }
+    .into()
 }
 impl Default for AppSettings {
     fn default() -> Self {
@@ -269,6 +279,7 @@ impl Default for AppSettings {
                 "Alt+Shift+X"
             }
             .into(),
+            visibility_shortcut: visibility_shortcut(),
             reduce_motion: false,
         }
     }
@@ -310,6 +321,7 @@ impl AppSettings {
             || !self.quick_colors.iter().all(|s| valid_color(s))
             || self.toggle_shortcut.len() > 80
             || self.clear_shortcut.len() > 80
+            || self.visibility_shortcut.len() > 80
         {
             return Err("설정 형식 또는 허용 범위가 올바르지 않습니다.".into());
         }
@@ -329,6 +341,7 @@ pub struct SettingsPatch {
     pub quick_colors: Option<Vec<String>>,
     pub toggle_shortcut: Option<String>,
     pub clear_shortcut: Option<String>,
+    pub visibility_shortcut: Option<String>,
     pub reduce_motion: Option<bool>,
 }
 impl SettingsPatch {
@@ -356,6 +369,9 @@ impl SettingsPatch {
             clear_shortcut: self
                 .clear_shortcut
                 .unwrap_or_else(|| current.clear_shortcut.clone()),
+            visibility_shortcut: self
+                .visibility_shortcut
+                .unwrap_or_else(|| current.visibility_shortcut.clone()),
             reduce_motion: self.reduce_motion.unwrap_or(current.reduce_motion),
         }
     }
@@ -376,6 +392,7 @@ pub struct DisplayInfo {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
+    pub annotations_visible: bool,
     pub mode: Mode,
     pub active_display_id: Option<String>,
     pub displays: Vec<DisplayInfo>,

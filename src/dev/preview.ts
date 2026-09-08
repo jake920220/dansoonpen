@@ -5,6 +5,7 @@ type Listener = (payload: unknown) => void;
 const listeners = new Map<string, Set<Listener>>();
 const displayId = 'preview-display';
 let state: AppState = {
+  annotationsVisible: true,
   mode: new URLSearchParams(location.search).get('view') === 'overlay' ? 'draw' : 'interact',
   activeDisplayId: displayId, revision: 1, error: null,
   settings: structuredClone(DEFAULT_SETTINGS), brush: defaultBrush(DEFAULT_SETTINGS),
@@ -33,7 +34,7 @@ export const preview = {
     switch (command) {
       case 'get_state': result = structuredClone(state); break;
       case 'get_scene': result = structuredClone(scene); break;
-      case 'set_mode': state.mode = args.mode as AppState['mode']; result = updateState(); break;
+      case 'set_mode': state.mode = args.mode as AppState['mode']; if (state.mode === 'draw') state.annotationsVisible = true; result = updateState(); break;
       case 'select_display': state.activeDisplayId = String(args.displayId); result = updateState(); break;
       case 'update_settings': {
         const patch = structuredClone(args.settings as Partial<AppState['settings']>);
@@ -57,6 +58,7 @@ export const preview = {
         history.push(scene.annotations); history = history.slice(-128); future = [];
         result = updateScene([...scene.annotations.filter((a) => !edit.removedIds.includes(a.id)), ...edit.added]); break;
       }
+      case 'toggle_annotations': state.annotationsVisible = !state.annotationsVisible; if (!state.annotationsVisible) state.mode = 'interact'; result = updateState(); break;
       case 'clear_all':
         if (scene.annotations.length) { history.push(scene.annotations); future = []; }
         scene.clearGeneration++;

@@ -280,7 +280,7 @@
 <svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); hideEraser(); }} />
 {#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>이곳에 설명을 그려 보세요.</h1><p>브라우저에서는 그리기 도구만 미리 볼 수 있습니다.</p><div class="preview-note">화면 위의 표시를 유지한 채<br /><strong>다음 이야기로 넘어가세요.</strong></div></div>{/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<canvas bind:this={canvas} class="drawing-surface" class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
+<canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
 <div bind:this={eraserCursor} class="eraser-cursor" style:width={`${Math.max(10, localWidth * 2) * 2}px`} style:height={`${Math.max(10, localWidth * 2) * 2}px`}></div>
 
 {#if drawing}
@@ -307,6 +307,7 @@
       </div>
       <span class="toolbar-divider"></span>
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
+      <button aria-label="필기 잠시 숨기기" title={`필기 잠시 숨기기 (${shortcutLabel(settings.visibilityShortcut)})`} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>
       <button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     {#snippet panel()}

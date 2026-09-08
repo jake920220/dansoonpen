@@ -14,14 +14,14 @@ export interface BrushPreset { name: string; brush: BrushSettings }
 export interface AppSettings {
   presets: BrushPreset[];
   version: number; color: string; width: number; textSize: number;
-  quickColors: string[]; toggleShortcut: string; clearShortcut: string; reduceMotion: boolean;
+  quickColors: string[]; toggleShortcut: string; clearShortcut: string; visibilityShortcut: string; reduceMotion: boolean;
 }
 export interface DisplayInfo {
   id: string; name: string; x: number; y: number; width: number; height: number;
   scaleFactor: number; isPrimary: boolean; connected: boolean;
 }
 export interface AppState {
-  mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
+  annotationsVisible: boolean; mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
   settings: AppSettings; brush: BrushSettings; revision: number; error: string | null;
 }
 export interface SceneSnapshot { displayId: string; revision: number; clearGeneration: number; annotations: Annotation[] }
@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { name: '빨간 밑줄', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 28 } },
     { name: '민트 메모', brush: { tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 32 } },
   ],
+  visibilityShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+V' : 'Alt+Shift+V',
   quickColors: ['#ffcf56', '#ff6b6b', '#57d9c6', '#78a9ff', '#c4a0ff', '#ffffff'],
   toggleShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+Z' : 'Alt+Shift+Z',
   clearShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+X' : 'Alt+Shift+X', reduceMotion: false,

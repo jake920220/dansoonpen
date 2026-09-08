@@ -26,12 +26,16 @@ struct Session(Mutex<RuntimeState>);
 struct TrayShortcuts {
     draw: MenuItem<tauri::Wry>,
     clear: MenuItem<tauri::Wry>,
+    visibility: MenuItem<tauri::Wry>,
 }
 impl TrayShortcuts {
     fn update(&self, settings: &AppSettings) -> tauri::Result<()> {
         // Native accelerators supply the right-aligned, platform-specific labels.
         self.draw.set_accelerator(Some(&settings.toggle_shortcut))?;
-        self.clear.set_accelerator(Some(&settings.clear_shortcut))
+        self.clear.set_accelerator(Some(&settings.clear_shortcut))?;
+        self.visibility.set_accelerator(
+            (!settings.visibility_shortcut.is_empty()).then_some(&settings.visibility_shortcut),
+        )
     }
 }
 // Windows WebView2 creation must run outside synchronous webview/menu callbacks.
@@ -89,6 +93,13 @@ fn label(id: &str) -> String {
     format!("overlay-{hash:016x}")
 }
 fn emit_state(app: &tauri::AppHandle, data: &mut RuntimeState) {
+    if let Some(tray) = app.try_state::<TrayShortcuts>() {
+        let _ = tray.visibility.set_text(if data.app.annotations_visible {
+            "필기 잠시 숨기기"
+        } else {
+            "숨긴 필기 다시 표시"
+        });
+    }
     data.app.revision += 1;
     let _ = app.emit("brush-state", &data.app);
 }
@@ -208,6 +219,9 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
     match result {
         Ok(()) => {
             data.app.mode = mode;
+            if mode == Mode::Draw {
+                data.app.annotations_visible = true;
+            }
             data.app.error = None;
             emit_state(app, data);
             Ok(())
@@ -221,6 +235,26 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             Err(e)
         }
     }
+}
+fn toggle_visibility(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    data.app.annotations_visible = !data.app.annotations_visible;
+    // Hiding exits drawing; restoring never steals focus or changes history.
+    if !data.app.annotations_visible && data.app.mode == Mode::Draw {
+        change_mode(app, data, Mode::Interact)
+    } else {
+        emit_state(app, data);
+        Ok(())
+    }
+}
+#[tauri::command]
+async fn toggle_annotations(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let state = lock(&app);
+        let mut data = state.0.lock().map_err(|e| e.to_string())?;
+        toggle_visibility(&app, &mut data)
+    })
+    .await
 }
 fn clear_and_interact(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
     let duration = fade(data);
@@ -238,28 +272,34 @@ fn report(app: &tauri::AppHandle, data: &mut RuntimeState, error: String) {
 }
 fn shortcuts(settings: &AppSettings) -> Result<Vec<Shortcut>, String> {
     settings.validate()?;
-    let a = Shortcut::from_str(&settings.toggle_shortcut)
-        .map_err(|e| format!("그리기 단축키 형식 오류: {e}"))?;
-    let b = Shortcut::from_str(&settings.clear_shortcut)
-        .map_err(|e| format!("삭제 단축키 형식 오류: {e}"))?;
-    if a.id() == b.id() {
-        return Err("그리기와 삭제 단축키는 서로 달라야 합니다.".into());
-    }
-    if a.mods.is_empty() || b.mods.is_empty() {
-        return Err(
-            "전역 단축키에는 Alt·Ctrl·Shift·Command 중 하나 이상의 보조 키가 필요합니다.".into(),
-        );
-    }
     let settings_key = Shortcut::from_str(if cfg!(target_os = "macos") {
         "Command+Comma"
     } else {
         "Control+Comma"
     })
     .map_err(|e| e.to_string())?;
-    if [a.id(), b.id()].contains(&settings_key.id()) {
-        return Err("이 조합은 설정 열기에 사용됩니다. 다른 단축키를 지정해 주세요.".into());
+    let mut keys = Vec::new();
+    for (name, value, optional) in [
+        ("그리기", &settings.toggle_shortcut, false),
+        ("전체 삭제", &settings.clear_shortcut, false),
+        ("필기 숨김", &settings.visibility_shortcut, true),
+    ] {
+        if optional && value.is_empty() {
+            continue;
+        }
+        let key = Shortcut::from_str(value).map_err(|e| format!("{name} 단축키 형식 오류: {e}"))?;
+        if key.mods.is_empty() {
+            return Err("전역 단축키에는 보조 키가 필요합니다.".into());
+        }
+        if key.id() == settings_key.id() {
+            return Err("이 조합은 설정 열기에 사용됩니다.".into());
+        }
+        if keys.iter().any(|k: &Shortcut| k.id() == key.id()) {
+            return Err("단축키는 서로 다른 조합으로 지정해 주세요.".into());
+        }
+        keys.push(key);
     }
-    Ok(vec![a, b])
+    Ok(keys)
 }
 fn replace_shortcuts(
     app: &tauri::AppHandle,
@@ -651,10 +691,20 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         true,
         Some(&settings.clear_shortcut),
     )?;
+    let visibility = MenuItem::with_id(
+        app,
+        "visibility",
+        "필기 잠시 숨기기",
+        true,
+        (!settings.visibility_shortcut.is_empty()).then_some(&settings.visibility_shortcut),
+    )?;
     // Cmd+Q is already provided by the standard macOS application menu.
     let quit_shortcut = cfg!(target_os = "macos").then_some("Command+Q");
     let quit = MenuItem::with_id(app, "quit", "My Brush 종료", true, quit_shortcut)?;
-    let menu = Menu::with_items(app, &[&control, &draw, &interact, &clear, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&control, &draw, &interact, &visibility, &clear, &quit],
+    )?;
     TrayIconBuilder::with_id("brush")
         .tooltip("My Brush — 화면 필기")
         .icon(tauri::image::Image::new_owned(tray_pixels(), 32, 32))
@@ -684,6 +734,9 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                         "interact" => {
                             let _ = change_mode(app, &mut d, Mode::Interact);
                         }
+                        "visibility" => {
+                            let _ = toggle_visibility(app, &mut d);
+                        }
                         "clear" => {
                             let _ = clear_and_interact(app, &mut d);
                         }
@@ -693,7 +746,11 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
             });
         })
         .build(app)?;
-    app.manage(TrayShortcuts { draw, clear });
+    app.manage(TrayShortcuts {
+        draw,
+        clear,
+        visibility,
+    });
     Ok(())
 }
 fn tray_pixels() -> Vec<u8> {
@@ -751,6 +808,10 @@ pub fn run() {
                                 .is_ok_and(|s| s.id() == id)
                             {
                                 let _ = clear_and_interact(&handle, &mut d);
+                            } else if Shortcut::from_str(&d.app.settings.visibility_shortcut)
+                                .is_ok_and(|s| s.id() == id)
+                            {
+                                let _ = toggle_visibility(&handle, &mut d);
                             }
                         };
                     });
@@ -768,6 +829,7 @@ pub fn run() {
             get_scene,
             apply_edit,
             clear_all,
+            toggle_annotations,
             undo,
             redo,
             show_control,
@@ -783,6 +845,7 @@ pub fn run() {
             };
             app.manage(Session(Mutex::new(RuntimeState {
                 app: AppState {
+                    annotations_visible: true,
                     mode: Mode::Interact,
                     active_display_id: None,
                     displays: vec![],

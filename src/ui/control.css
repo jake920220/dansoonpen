@@ -97,3 +97,6 @@
 .preset-details input { width: 100%; background: transparent; border: 1px solid #3c4656; padding: 6px; border-radius: 5px; color: #dbe3ef; font-size: 12px; }
 .preset-details small { display: block; color: #8998af; margin-top: 5px; font-size: 10px; }
 .preset-setting .secondary { font-size: 10px; padding: 8px; }
+
+.session-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 24px; }
+.session-actions > span { color: var(--muted); font-size: 12px; }

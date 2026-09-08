@@ -12,8 +12,23 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
     if file.metadata().map_err(|e| e.to_string())?.len() > 64 * 1024 {
         return Err("설정 파일이 너무 큽니다.".into());
     }
-    let mut settings: AppSettings =
+    let value: serde_json::Value =
         serde_json::from_reader(file).map_err(|e| format!("설정 파일을 읽지 못했습니다: {e}"))?;
+    let adding_visibility = value.get("visibilityShortcut").is_none();
+    let mut settings: AppSettings =
+        serde_json::from_value(value).map_err(|e| format!("설정 파일을 읽지 못했습니다: {e}"))?;
+    if adding_visibility {
+        use std::str::FromStr;
+        use tauri_plugin_global_shortcut::Shortcut;
+        if let Ok(new) = Shortcut::from_str(&settings.visibility_shortcut) {
+            if [&settings.toggle_shortcut, &settings.clear_shortcut]
+                .iter()
+                .any(|s| Shortcut::from_str(s).is_ok_and(|s| s.id() == new.id()))
+            {
+                settings.visibility_shortcut.clear();
+            }
+        }
+    }
     if settings.version == 1 {
         // Upgrade the previous defaults, retaining individually customized settings.
         if settings.width == 5. {
@@ -74,6 +89,22 @@ pub fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn visibility_migration_preserves_an_existing_key_assignment() {
+        let path =
+            std::env::temp_dir().join(format!("my-brush-visibility-{}.json", std::process::id()));
+        let mut json = serde_json::to_value(AppSettings::default()).unwrap();
+        json["toggleShortcut"] = json["visibilityShortcut"].clone();
+        json.as_object_mut().unwrap().remove("visibilityShortcut");
+        std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+        let loaded = load(&path).unwrap();
+        assert!(loaded.visibility_shortcut.is_empty());
+        assert_eq!(
+            loaded.toggle_shortcut,
+            AppSettings::default().visibility_shortcut
+        );
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn old_defaults_upgrade_without_discarding_custom_colors_or_keys() {
         let path =

@@ -25,7 +25,7 @@
   function accept(next: AppState) {
     if (appState && next.revision < appState.revision) return;
     appState = next;
-    const shortcuts = dirty ? { toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut } : {};
+    const shortcuts = dirty ? { toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut, visibilityShortcut: draft.visibilityShortcut } : {};
     draft = { ...structuredClone(next.settings), ...optimistic, ...shortcuts };
   }
   const writer = new SettingsWriter(bridge.updateSettings, accept, (pending) => {
@@ -73,7 +73,7 @@
   async function save() {
     await action(async () => {
       await captureEdits;
-      const next = await bridge.updateSettings({ toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut });
+      const next = await bridge.updateSettings({ toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut, visibilityShortcut: draft.visibilityShortcut });
       dirty = false; accept(next); saved = true;
     });
   }
@@ -102,6 +102,7 @@
         <button class="primary" disabled={!ready} onclick={start}><Icon name="pen" size={18} />그리기 시작<kbd>{shortcutLabel(appState?.settings.toggleShortcut ?? DEFAULT_SETTINGS.toggleShortcut)}</kbd></button>
         <div class="ink-sample" aria-hidden="true"><svg viewBox="0 0 240 140"><path class="sample-line" d="M20 103Q64 65 91 85T173 57T215 77" /><path class="sample-underline" d="M28 117Q116 122 212 99" /><circle cx="205" cy="28" r="15" /><path class="sample-spark" d="m168 17 6 5m53 30 7 1m-50-48-1 7" /></svg><span>이 순간을 짚어 주세요</span></div>
       </section>
+      <div class="session-actions"><button class="secondary" disabled={!ready} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={18} />{appState?.annotationsVisible ? '필기 잠시 숨기기' : '숨긴 필기 다시 표시'}<kbd>{shortcutLabel(draft.visibilityShortcut)}</kbd></button><span>{appState?.annotationsVisible ? '내용과 실행 취소 기록은 유지됩니다.' : '필기를 숨겼습니다. 다시 그리면 자동으로 표시됩니다.'}</span></div>
       <section class="display-card">
         <div class="card-icon"><Icon name="monitor" size={24} /></div>
         <div class="display-details"><h2>그릴 화면</h2><p>{selected ? `${Math.round(selected.width)} × ${Math.round(selected.height)} · ${Math.round(selected.scaleFactor * 100)}% 배율` : '화면을 찾고 있습니다'}</p></div>
@@ -139,11 +140,12 @@
         <section class="settings-section"><h2><Icon name="keyboard" size={18} />단축키</h2>
           <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>
           <div class="setting-row"><label for="clear-shortcut">전체 지우기</label><ShortcutRecorder id="clear-shortcut" value={draft.clearShortcut} onchange={(value) => { draft.clearShortcut = value; change(); }} {capture} /></div>
+          <div class="setting-row"><label for="visibility-shortcut">필기 숨기기 / 다시 표시</label><ShortcutRecorder id="visibility-shortcut" value={draft.visibilityShortcut} onchange={(value) => { draft.visibilityShortcut = value; change(); }} {capture} /><button type="button" class="secondary" onclick={() => { draft.visibilityShortcut = ''; change(); }}>해제</button></div>
           <p class="field-hint">입력칸을 클릭하고 원하는 키를 함께 누른 뒤 놓으세요. ‘단축키 적용’을 누르면 사용됩니다. 다른 앱의 단축키·특수문자 입력과 겹치면 조합을 바꿔 주세요.</p>
-          <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; change(); }}>왼손 추천 조합</button><span class="success" role="status">{saved ? '단축키를 적용했습니다.' : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>단축키 적용</button></div>
+          <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; draft.visibilityShortcut = DEFAULT_SETTINGS.visibilityShortcut; change(); }}>왼손 추천 조합</button><span class="success" role="status">{saved ? '단축키를 적용했습니다.' : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>단축키 적용</button></div>
         </section>
         <section class="settings-section"><label class="checkbox-row"><span><strong>애니메이션 줄이기</strong><small>지우기 명령을 누르면 그림을 즉시 지웁니다.</small></span><input type="checkbox" checked={draft.reduceMotion} onchange={(e) => appearance({ reduceMotion: e.currentTarget.checked })} /></label></section>
-        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; change(); }}>기본값으로</button></div>
+        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, visibilityShortcut, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; draft.visibilityShortcut = visibilityShortcut; change(); }}>기본값으로</button></div>
         </fieldset>
       </form>
     {:else}

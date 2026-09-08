@@ -31,3 +31,7 @@ Each SceneSnapshot and SceneEdit carries `clearGeneration`. Native clear increme
 Native maintains per-display scenes, revision, bounded global history with shared annotation storage where possible. On display unplug hide overlay without discarding scene; restore when known display returns. Scene changes must not show inactive/disconnected windows. Frontend calls get_state/get_scene AFTER registering listeners, and ignores older revisions.
 
 V0.2 adds arrows and highlighter strokes. `stroke.opacity` defaults to 1 for old strokes; highlighters use width 8–64 and opacity 0.1–0.8. `arrow` contains start/end/color/width, with shared frontend geometry for rendering and erasing. AppState.brush is transient; settings v3 contains 3 persistent presets and adds defaults when loading v1/v2 files. Highlighter fields on older preset brushes deserialize to 24px/0.32. Toolbar location is a separate local WebView UI preference keyed by display ID. Cursor effects and other shapes remain deferred. UI labels Korean, shortcuts use Alt mapped to Option on macOS. All commands validate caller permissions/arguments and errors are user-visible with native interact fallback where input can be trapped.
+
+## 필기 임시 숨김
+
+`AppState.annotationsVisible`은 세션 표시 상태다. `toggle_annotations`는 주석과 undo/redo를 건드리지 않는다. 숨기기는 입력을 해제하고, 복원은 앱 포커스를 바꾸지 않는다. 그리기 진입은 표시 상태를 복원한다. 설정의 `visibilityShortcut`(macOS Option+V / Windows Alt+Shift+V)은 빈 문자열로 해제할 수 있다. 이전 설정에 같은 조합을 이미 배정했다면 새 단축키만 비활성으로 마이그레이션한다. 숨겨진 동안 clear/undo가 이루어지면 최신 장면이 복원된다.
