@@ -133,7 +133,7 @@
             <div class="preset-setting">
               <span class="preset-chip" style:background={preset.brush.color}>{i + 1}</span>
               <div class="preset-details"><input aria-label={`프리셋 ${i + 1} 이름`} maxlength="24" value={preset.name} onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.currentTarget.blur(); } }} onchange={(e) => { const name = e.currentTarget.value; void action(async () => accept(await bridge.updatePreset(i, name))); }} /><small>{TOOL_LABELS[preset.brush.tool]} · {preset.brush.tool === 'text' ? preset.brush.textSize : preset.brush.tool === 'highlighter' ? preset.brush.highlighterWidth : preset.brush.width}px{preset.brush.tool === 'highlighter' ? ` · ${Math.round(preset.brush.highlighterOpacity * 100)}%` : ''} · {preset.brush.color.toUpperCase()}</small></div>
-              <button type="button" class="secondary" onclick={() => action(async () => accept(await bridge.updateBrush(preset.brush)))}>불러오기</button>
+              <button type="button" class="secondary" onclick={() => action(async () => accept(await bridge.updateBrush(preset.brush, appState!.brushGeneration)))}>불러오기</button>
               <button type="button" class="secondary" onclick={() => action(async () => { if (appState) accept(await bridge.updatePreset(i, undefined, appState.brush)); })}>현재 도구로 저장</button>
             </div>
           {/each}

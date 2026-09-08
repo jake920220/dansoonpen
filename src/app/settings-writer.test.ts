@@ -3,7 +3,7 @@ import { SettingsWriter } from './settings-writer';
 import { DEFAULT_SETTINGS, defaultBrush, type AppSettings, type AppState } from '../shared/types';
 
 afterEach(() => vi.useRealTimers());
-const state = (settings = DEFAULT_SETTINGS): AppState => ({ cursorEnabled: false, annotationsVisible: true, settings, brush: defaultBrush(settings), mode: 'interact', activeDisplayId: null, revision: 1, error: null, displays: [] });
+const state = (settings = DEFAULT_SETTINGS): AppState => ({ brushGeneration: 0, cursorEnabled: false, annotationsVisible: true, settings, brush: defaultBrush(settings), mode: 'interact', activeDisplayId: null, revision: 1, error: null, displays: [] });
 it('coalesces rapid edits and sends only the changed fields', async () => {
   vi.useFakeTimers();
   const save = vi.fn(async () => state());
@@ -31,4 +31,21 @@ it('reports persistence failures and releases optimistic values so the saved set
   const writer = new SettingsWriter(async () => { throw new Error('disk full'); }, vi.fn(), changed, failed);
   writer.update({ color: '#ff6b6b' }); await writer.flush();
   expect(failed).toHaveBeenCalledOnce(); expect(changed).toHaveBeenLastCalledWith({});
+});
+
+it('invalidates pending and queued writes on a new drawing entry without clearing newer optimism', async () => {
+  let complete!: (state: AppState) => void;
+  const save = vi.fn().mockImplementationOnce(() => new Promise<AppState>(resolve => complete = resolve)).mockResolvedValue(state());
+  const changed = vi.fn();
+  const writer = new SettingsWriter(save, vi.fn(), changed, vi.fn());
+  writer.update({ color: '#ff6b6b' }); const first = writer.flush();
+  await Promise.resolve();
+  writer.update({ width: 20 }); const oldQueue = writer.flush();
+  writer.update({ color: '#57d9c6' });
+  writer.invalidate();
+  writer.update({ width: 8 });
+  complete(state()); await first; await oldQueue;
+  expect(changed).toHaveBeenLastCalledWith({ width: 8 });
+  await writer.flush();
+  expect(save.mock.calls).toEqual([[{ color: '#ff6b6b' }], [{ width: 8 }]]);
 });

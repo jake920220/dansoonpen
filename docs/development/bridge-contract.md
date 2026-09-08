@@ -7,7 +7,7 @@ Commands (Tauri invoke):
 - `set_mode { mode }` -> AppState
 - `select_display { displayId }` -> AppState
 - `update_settings { settings }` -> AppState; merge only supplied fields into current native settings, validate/persist and re-register shortcuts transactionally. Default color/width/textSize edits also patch the current brush; unrelated settings leave it intact. Writes are transactional: a persistence failure does not apply the brush patch.
-- `update_brush { brush }` -> AppState; validate and merge current tool fields in native memory, shared by all overlays. Never writes startup defaults.
+- `update_brush { brush, brushGeneration }` -> AppState; validate and merge current tool fields in native memory, shared by all overlays. Never writes startup defaults. Ignore writes from earlier drawing entries using AppState.brushGeneration. A successful interact→draw transition advances this generation and restores the saved default pen; draw→draw display/focus changes preserve the current brush.
 - `update_preset { index, name?, brush? }` -> AppState; validate and persist a single preset slot without replacing other slots or current tool.
 - `capture_shortcut { active }` -> void; control window only. Suspend the app's global shortcuts while its focused recorder captures a key combination. Restore on exit, native focus loss or control close.
 - `get_scene { displayId }` -> SceneSnapshot

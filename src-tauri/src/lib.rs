@@ -267,10 +267,7 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
     })();
     match result {
         Ok(()) => {
-            data.app.mode = mode;
-            if mode == Mode::Draw {
-                data.app.annotations_visible = true;
-            }
+            data.app.complete_mode(mode);
             data.app.error = None;
             emit_state(app, data);
             diagnostics::state(app, data, "mode_complete");
@@ -634,14 +631,13 @@ async fn update_brush(
     window: WebviewWindow,
     app: tauri::AppHandle,
     brush: BrushPatch,
+    brush_generation: u64,
 ) -> Result<AppState, String> {
     native_command(app.clone(), "update_brush", move || {
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
-        let brush = brush.apply(&d.app.brush);
-        brush.validate()?;
-        d.app.brush = brush;
+        d.app.apply_brush(brush, brush_generation)?;
         emit_state(&app, &mut d);
         Ok(d.app.clone())
     })
@@ -1067,6 +1063,7 @@ pub fn run() {
             };
             app.manage(Session(Mutex::new(RuntimeState {
                 app: AppState {
+                    brush_generation: 0,
                     cursor_enabled: false,
                     annotations_visible: true,
                     mode: Mode::Interact,

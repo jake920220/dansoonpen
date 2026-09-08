@@ -96,7 +96,9 @@
     const changedMode = !appState || appState.mode !== next.mode || appState.activeDisplayId !== next.activeDisplayId;
     const leaving = drawing && (next.mode !== 'draw' || next.activeDisplayId !== displayId);
     if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
+    const newEntry = appState && appState.brushGeneration !== next.brushGeneration;
     appState = next;
+    if (newEntry) brushWriter.invalidate();
     localWidth = optimisticBrush.width ?? next.brush.width;
     localTextSize = optimisticBrush.textSize ?? next.brush.textSize;
     if (changedMode) reportDiagnostic('state');
@@ -285,7 +287,7 @@
   const settingsWriter = new SettingsWriter(bridge.updateSettings, acceptState, (pending) => {
     optimisticSettings = pending;
   }, (e) => { if (!disposed) error = message(e); });
-  const brushWriter = new SettingsWriter<BrushSettings>(bridge.updateBrush, acceptState, (pending) => {
+  const brushWriter = new SettingsWriter<BrushSettings>((patch) => bridge.updateBrush(patch, appState!.brushGeneration), acceptState, (pending) => {
     optimisticBrush = pending;
     localWidth = pending.width ?? appState?.brush.width ?? DEFAULT_SETTINGS.width;
     localTextSize = pending.textSize ?? appState?.brush.textSize ?? DEFAULT_SETTINGS.textSize;

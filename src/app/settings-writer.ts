@@ -6,6 +6,7 @@ export class SettingsWriter<T extends object = AppSettings> {
   private optimistic: Partial<T> = {};
   private versions = new Map<keyof T, number>();
   private sequence = 0;
+  private epoch = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private edits: Promise<void> = Promise.resolve();
   constructor(
@@ -22,16 +23,25 @@ export class SettingsWriter<T extends object = AppSettings> {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => { void this.flush(); }, 100);
   }
+  invalidate() {
+    this.epoch++;
+    clearTimeout(this.timer);
+    this.pending = {}; this.optimistic = {}; this.versions.clear();
+    this.changed({});
+  }
   flush(): Promise<void> {
     clearTimeout(this.timer);
     const patch = this.pending;
     if (!Object.keys(patch).length) return this.edits;
     this.pending = {};
     const versions = new Map(this.versions);
+    const epoch = this.epoch;
     this.edits = this.edits.then(async () => {
+      if (epoch !== this.epoch) return;
       try { this.accept(await this.save(patch)); }
       catch (error) { this.failed(error); }
       finally {
+        if (epoch !== this.epoch) return;
         const remaining = { ...this.optimistic };
         for (const key of Object.keys(patch) as (keyof T)[]) {
           if (versions.get(key) === this.versions.get(key)) delete remaining[key];

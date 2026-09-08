@@ -415,6 +415,7 @@ pub struct DisplayInfo {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
+    pub brush_generation: u64,
     pub cursor_enabled: bool,
     pub annotations_visible: bool,
     pub mode: Mode,
@@ -424,6 +425,30 @@ pub struct AppState {
     pub brush: BrushSettings,
     pub revision: u64,
     pub error: Option<String>,
+}
+impl AppState {
+    // Called only after native input/focus transition succeeds. Re-selecting a
+    // display while already drawing must not reset the current tool.
+    pub fn complete_mode(&mut self, mode: Mode) {
+        if mode == Mode::Draw && self.mode != Mode::Draw {
+            self.brush_generation += 1;
+            self.brush = BrushSettings::from_defaults(&self.settings);
+        }
+        self.mode = mode;
+        if mode == Mode::Draw {
+            self.annotations_visible = true;
+        }
+    }
+    pub fn apply_brush(&mut self, patch: BrushPatch, generation: u64) -> Result<(), String> {
+        // Ignore delayed palette/tool writes belonging to an earlier drawing entry.
+        if generation != self.brush_generation {
+            return Ok(());
+        }
+        let brush = patch.apply(&self.brush);
+        brush.validate()?;
+        self.brush = brush;
+        Ok(())
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -670,6 +695,68 @@ impl SceneStore {
 }
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn reentry_resets_to_saved_pen_and_rejects_late_tool_writes() {
+        let settings = AppSettings {
+            width: 14.,
+            color: "#57d9c6".into(),
+            ..Default::default()
+        };
+        let mut state = AppState {
+            brush_generation: 0,
+            cursor_enabled: false,
+            annotations_visible: true,
+            mode: Mode::Interact,
+            active_display_id: None,
+            displays: vec![],
+            brush: BrushSettings::from_defaults(&settings),
+            settings,
+            revision: 0,
+            error: None,
+        };
+        state.complete_mode(Mode::Draw);
+        let first = state.brush_generation;
+        state
+            .apply_brush(
+                BrushPatch {
+                    tool: Some(Tool::Text),
+                    color: Some("#ff6b6b".into()),
+                    ..Default::default()
+                },
+                first,
+            )
+            .unwrap();
+        state.complete_mode(Mode::Draw); // Focus/display re-selection is not a fresh entry.
+        assert_eq!(state.brush.tool, Tool::Text);
+        assert_eq!(state.brush_generation, first);
+        state.complete_mode(Mode::Interact);
+        assert_eq!(state.brush.tool, Tool::Text);
+        state.complete_mode(Mode::Draw);
+        assert_eq!(state.brush, BrushSettings::from_defaults(&state.settings));
+        assert_eq!(state.brush.width, 14.);
+        state
+            .apply_brush(
+                BrushPatch {
+                    tool: Some(Tool::Eraser),
+                    width: Some(32.),
+                    ..Default::default()
+                },
+                first,
+            )
+            .unwrap();
+        assert_eq!(state.brush, BrushSettings::from_defaults(&state.settings));
+        state
+            .apply_brush(
+                BrushPatch {
+                    tool: Some(Tool::Highlighter),
+                    ..Default::default()
+                },
+                state.brush_generation,
+            )
+            .unwrap();
+        assert_eq!(state.brush.tool, Tool::Highlighter);
+    }
     use super::*;
     fn text_note(id: &str, text: &str) -> Annotation {
         Annotation::Text {

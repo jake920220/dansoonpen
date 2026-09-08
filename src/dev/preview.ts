@@ -5,6 +5,7 @@ type Listener = (payload: unknown) => void;
 const listeners = new Map<string, Set<Listener>>();
 const displayId = 'preview-display';
 let state: AppState = {
+  brushGeneration: 0,
   cursorEnabled: false, annotationsVisible: true,
   mode: new URLSearchParams(location.search).get('view') === 'overlay' ? 'draw' : 'interact',
   activeDisplayId: displayId, revision: 1, error: null,
@@ -36,7 +37,7 @@ export const preview = {
       case 'toggle_cursor': state.cursorEnabled = !state.cursorEnabled; result = updateState(); break;
       case 'get_state': result = structuredClone(state); break;
       case 'get_scene': result = structuredClone(scene); break;
-      case 'set_mode': state.mode = args.mode as AppState['mode']; if (state.mode === 'draw') state.annotationsVisible = true; result = updateState(); break;
+      case 'set_mode': if (args.mode === 'draw' && state.mode !== 'draw') { state.brushGeneration++; state.brush = defaultBrush(state.settings); } state.mode = args.mode as AppState['mode']; if (state.mode === 'draw') state.annotationsVisible = true; result = updateState(); break;
       case 'select_display': state.activeDisplayId = String(args.displayId); result = updateState(); break;
       case 'update_settings': {
         const patch = structuredClone(args.settings as Partial<AppState['settings']>);
@@ -46,7 +47,7 @@ export const preview = {
         }
         result = updateState(); break;
       }
-      case 'update_brush': state.brush = { ...state.brush, ...structuredClone(args.brush as Partial<AppState['brush']>) }; result = updateState(); break;
+      case 'update_brush': if (args.brushGeneration !== state.brushGeneration) { result = structuredClone(state); break; } state.brush = { ...state.brush, ...structuredClone(args.brush as Partial<AppState['brush']>) }; result = updateState(); break;
       case 'update_preset': {
         const preset = state.settings.presets[Number(args.index)];
         if (typeof args.name === 'string') preset.name = args.name;
