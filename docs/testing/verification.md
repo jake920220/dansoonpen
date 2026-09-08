@@ -1,17 +1,17 @@
 # 2026-09-08 구현 인수 기록
 
-상태: **v0.3 코드와 macOS 로컬 테스트 패키지 준비 완료. 양 OS 정식 지원 검증은 미완료.**
+상태: **v0.3.1 코드와 macOS 로컬 테스트 패키지 준비 완료. 양 OS 정식 지원 검증은 미완료.**
 
 ## 통과한 검사
 
 | 검사 | 결과 |
 | --- | --- |
 | `npm run check` | Svelte 오류0·경고0 |
-| `npm test` | 7개 파일, 30개 테스트 통과 |
+| `npm test` | 8개 파일, 41개 테스트 통과 |
 | `cargo fmt --check` | 통과 |
 | `cargo clippy --all-targets -- -D warnings` | 통과 |
-| `cargo test` | 28개 테스트 통과 |
-| `npm run tauri build -- --bundles app` | macOS arm64 v0.3 release 빌드 성공 |
+| `cargo test` | 34개 테스트 통과 |
+| `npm run tauri build -- --bundles app` | macOS arm64 v0.3.1 release 빌드 성공 |
 | `node scripts/generate-notices.mjs --check` | 잠금 파일·로컬 원문 일치, 303개 의존성 고지 |
 | 독립 아키텍처 검토 | v0.1 당시 APPROVE, [검토 기록](architecture-review.md) |
 | 실제 macOS 핵심 흐름 | v0.1에서 준현님이 투명 필기·Esc 후 필기 유지 및 뒤 앱 조작 정상 확인. v0.2·v0.3 실기는 아래 별도 기록 |
@@ -22,8 +22,8 @@ Rust 최종 검사는 실제 번들 리소스를 사용했다. 초기 리소스 
 
 ## 전달물
 
-- `artifacts/My-Brush-0.3.0-macOS-arm64.zip`: 로컬 검증용 macOS 앱. ad-hoc 서명이며 Developer ID 공증본은 아니다.
-- `artifacts/My-Brush-0.3.0-source.zip`: 최종 기능·문서를 반영한 소스 사본(Git 이력 제외). Windows PC에서 압축을 풀고 README의 준비 절차와 `scripts/verify-windows.ps1`을 실행한다.
+- `artifacts/My-Brush-0.3.1-macOS-arm64.zip`: 로컬 검증용 macOS 앱. ad-hoc 서명이며 Developer ID 공증본은 아니다.
+- `artifacts/My-Brush-0.3.1-source.zip`: 최종 기능·문서를 반영한 소스 사본(Git 이력 제외). Windows PC에서 압축을 풀고 README의 준비 절차와 `scripts/verify-windows.ps1`을 실행한다.
 - `artifacts/SHA256SUMS.txt`: 전달 ZIP의 체크섬.
 - 바이너리와 임시 로그는 Git에 넣지 않는다. 리모트·push·공개 업로드는 수행하지 않았다.
 
@@ -83,3 +83,11 @@ Rust 최종 검사는 실제 번들 리소스를 사용했다. 초기 리소스 
 - Windows 실기는 준현님 요청에 따라 이후 진행한다. Windows 소스 경로가 존재하는 것을 실기 지원 확인으로 표시하지 않는다.
 
 성능의 실제 측정 조건과 수치는 [성능 기록](performance.md)에 별도로 기록한다. 혼합 부하나 짧은 측정을 통제된 유휴 성능 합격으로 해석하지 않는다.
+
+## v0.3.1 재발 진단 로그 (2026-09-08)
+
+- 사용자가 전체 화면의 검은 회색 덮임과 Option+X·Option+Z 무응답을 추가 설명했고, 재발 시 조사할 수 있는 로그를 요청했다. 증상과 기존 근거는 [사건 조사](incident-2026-09-08.md), 기록 항목·보관 위치는 [진단 안내](diagnostics.md)에 남겼다.
+- 전역 키 수신·처리 시작, 모드 전환 단계, 창 생성·프레임·배율·불투명·입력 상태, 화면 구성, 네이티브 응답 대기, WebView·Canvas 생존 상태를 기록한다. 오류 원문이나 필기 내용은 수집하지 않는다.
+- 추가 자동 검사: Rust 6개(회전·재실행 보존·독립 writer 회전·큐 포화·종료 배출·필드/권한), 프런트엔드 11개(스키마·오류 폭주·단일 IPC·실패·heartbeat·정리·Canvas 이벤트·배경 alpha).
+- 전체 프런트엔드41개·Rust34개 통과. Svelte 오류/경고0, fmt·strict Clippy 및 기존 303개 의존성 고지 일치를 확인했다. 의존성 추가 없이 버전·잠금 해시를 갱신했다.
+- v0.3.1은 진단 기능을 추가한 빌드다. 알려진 배율·활성화 순서 문제를 추측으로 수정하지 않았고, 검은 화면 재발 방지를 검증한 결과가 아니다. 이번에는 GUI를 실행하거나 강의 화면공유를 재현하지 않았다. 다음 실제 실행부터 로그가 생성된다.

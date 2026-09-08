@@ -89,7 +89,7 @@
       <button class:active={tab === 'settings'} onclick={() => tab = 'settings'}><Icon name="settings" />설정</button>
       <button class:active={tab === 'about'} onclick={() => tab = 'about'}><Icon name="info" />앱 정보</button>
     </nav>
-    <div class="sidebar-bottom"><span class="status-dot" class:drawing={appState?.mode === 'draw'}></span>{appState?.mode === 'draw' ? '그리는 중' : appState ? '사용 준비 완료' : '연결 중'}<span class="version">v0.3.0</span></div>
+    <div class="sidebar-bottom"><span class="status-dot" class:drawing={appState?.mode === 'draw'}></span>{appState?.mode === 'draw' ? '그리는 중' : appState ? '사용 준비 완료' : '연결 중'}<span class="version">v0.3.1</span></div>
   </aside>
   <main class="control-main">
     <header class="page-heading"><span>{tab === 'start' ? '설명에 필요한 만큼만.' : tab === 'settings' ? '나에게 맞는 도구로.' : '함께 만드는 작은 도구.'}</span><span class="local-label">{native ? '오프라인으로 작동' : '브라우저 미리보기'}</span></header>
@@ -156,10 +156,10 @@
         </fieldset>
       </form>
     {:else}
-      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>My Brush</h1><p>설명을 오래 남기는 화면 드로잉 도구</p><span class="about-version">VERSION 0.3.0</span>
+      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>My Brush</h1><p>설명을 오래 남기는 화면 드로잉 도구</p><span class="about-version">VERSION 0.3.1</span>
         <div class="about-details"><div><span>원저작자</span><strong>김준현</strong></div><div><span>라이선스</span><strong>Apache License 2.0</strong></div><div><span>원본 저장소</span><strong>공개 준비 중</strong></div></div>
         <p class="about-note">Copyright 2026 김준현<br />재배포 시 관련 저작권·출처 고지를 유지해 주세요.<br />라이선스 전문과 고지는 설치 배포물에 함께 제공됩니다.</p>
-        <p class="about-note">화면을 녹화하거나 서버로 전송하지 않습니다.<br />설정만 이 기기에 저장하며, 그림은 앱을 종료하면 사라집니다.</p>
+        <p class="about-note">화면을 녹화하거나 서버로 전송하지 않습니다.<br />설정과 진단 로그를 이 기기에 저장하며, 로그에는 필기 내용을 담지 않습니다.<br />그림은 앱을 종료하면 사라집니다.</p>
         <button class="secondary" onclick={() => action(bridge.quit)} disabled={busy}><Icon name="power" size={16} />앱 종료</button>
       </section>
     {/if}

@@ -23,8 +23,8 @@ Inventory scope:
 - Identical source texts are stored once and referenced by every applicable package.
 - This generated inventory is not a legal assurance or a complete release audit.
 Rust targets: aarch64-apple-darwin, x86_64-apple-darwin, aarch64-pc-windows-msvc, x86_64-pc-windows-msvc
-package-lock.json SHA-256: 9e1b2b73ecb72ae1546d903d5811d3b047c97cb396f71d590db029ec975f3b37
-Cargo.lock SHA-256: a7cac12ce669fbb0f544101c72a5d45d948c01583f69fb918379addb8ae043c4
+package-lock.json SHA-256: 1e804b49687d9be82a31377293194f0e29e7a1f38bcb4867431bd14217efac9e
+Cargo.lock SHA-256: 0efe3f687e71f6273860f5d25273e7eeeb0ffd98f028d6575877f18cab2e90cd
 Packages: 20 npm, 283 Cargo
 Distinct reproduced documents: 176
 
