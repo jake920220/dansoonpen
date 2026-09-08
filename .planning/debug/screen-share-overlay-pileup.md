@@ -10,7 +10,7 @@ updated: 2026-09-08
 hypothesis: incident trigger remains unknown; one overlay page weakens window multiplication. Confirmed adjacent risks are target/current DPI conversion, nonfocusable show warnings, and macOS non-exclusive shortcut registrations
 test: correlate user's exact visual symptom, sharing app and display/key actions with existing lifecycle logs; native reproduction must be a later controlled step
 expecting: distinguish compositor ghosting or share-preview feedback from actual window growth, then select a falsifiable incident hypothesis
-next_action: user authorized bounded persistent diagnostics for recurrence. Add command/window/watchdog metadata and frontend liveness/context signals; root cause remains unconfirmed. No speculative focus/geometry fix.
+next_action: v0.3.1 persistent diagnostics implemented. New intermittent shortcut report analyzed in docs/testing/incident-2026-09-08-hotkeys.md. Correlate reported time/app with the 13:29 native/WebView focus discrepancy; no shortcut loss inside the app established. No speculative focus/geometry fix.
 
 ## Symptoms
 
@@ -96,3 +96,13 @@ files_changed: []
 ## Investigation outcome
 
 INCONCLUSIVE for the reported incident. Confidence high in the two source-level native risks and API non-exclusivity; confidence low that any one is the incident root cause. User clarification and eventual controlled native reproduction are needed. Current available logs support one native overlay page, not a growing set.
+
+## Follow-up: v0.3.1 shortcut report (2026-09-08)
+
+- Diagnostic implementation committed as `9c88809`; runnable v0.3.1 packaged as `b1de592`. This added evidence collection, not an incident fix.
+- User reports intermittent inability to enter drawing with shortcuts. Preserved the 12:58–13:44 session under ignored `artifacts/incident-20260908-hotkeys/`; 4,000 records with no sequence gaps or dropped entries.
+- All 162 received presses have matching actions and releases (97 toggles, 65 clears). All 72 drawing entries have later native focus acquisition, within 137ms of mode.begin. All 275 native probes match mode/input state; no watchdog stalls or application error events.
+- At 13:29:10.683 native focus is lost while mode remains draw, before any exit command. Alt+X at 13:29:11.618 is processed successfully. WebView reports focused=true for five interact heartbeats through 13:29:54.815, while native probes report key=false and input pass-through. Trigger and relationship to reported shortcut failure are unknown.
+- OS log contains 72 nonfocusable makeKeyWindow warnings, two memory-pressure messages at 13:22:11, and inactive control-WebView layer volatility warnings. These do not establish failure of the drawing WebView.
+- Physical key presses never delivered by macOS remain unobservable in this log. Asked user for incident time/foreground app. Read-only investigation; no app launch/input/restart or product behavior changes.
+- Full findings: [간헐적 그리기 단축키 무반응 조사](../../docs/testing/incident-2026-09-08-hotkeys.md).
