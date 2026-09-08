@@ -3,7 +3,7 @@
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
   import { arrowEndpoint } from '../canvas/arrow';
   import { CanvasRenderer } from '../canvas/renderer';
-  import { appendStrokePoint, hitTestAnnotationsAlongSegment, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
+  import { appendStrokePoint, hitTestAnnotationsAlongSegment, textAtPoint, textLineBounds, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
   import { DEFAULT_SETTINGS, TOOL_LABELS, defaultBrush, type ArrowAnnotation, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
   import ToolbarFrame from './ToolbarFrame.svelte';
@@ -24,7 +24,7 @@
   let localWidth = $state(DEFAULT_SETTINGS.width);
   let localTextSize = $state(DEFAULT_SETTINGS.textSize);
   let annotationCount = $state(0);
-  let textEntry = $state<{ x: number; y: number; value: string; color: string; fontSize: number } | null>(null);
+  let textEntry = $state<{ x: number; y: number; value: string; color: string; fontSize: number; original?: TextAnnotation } | null>(null);
   let composing = false;
   let compositionEndedAt = 0;
   let scene: SceneSnapshot = { displayId: '', revision: -1, clearGeneration: 0, annotations: [] };
@@ -51,9 +51,9 @@
 
   function visibleAnnotations(): Annotation[] {
     const ids = new Set(scene.annotations.map((a) => a.id));
-    return [...scene.annotations.filter((a) => !erased.has(a.id) && !pendingRemovals.has(a.id)), ...[...pendingAdds.values()].filter((a) => !ids.has(a.id) && !erased.has(a.id) && !pendingRemovals.has(a.id))];
+    return [...scene.annotations.filter((a) => !erased.has(a.id) && (!pendingRemovals.has(a.id) || pendingAdds.has(a.id))).map((a) => pendingAdds.get(a.id) ?? a), ...[...pendingAdds.values()].filter((a) => !ids.has(a.id) && !erased.has(a.id))];
   }
-  function renderScene() { const annotations = visibleAnnotations(); renderer?.setScene(annotations); annotationCount = annotations.length; }
+  function renderScene() { const annotations = visibleAnnotations(); renderer?.setScene(annotations.filter((a) => a.id !== textEntry?.original?.id)); annotationCount = annotations.length; }
   function acceptScene(next: SceneSnapshot, removed: Annotation[] = [], duration?: number) {
     if (next.displayId !== displayId || next.revision < scene.revision) return;
     // Eraser hits already started their fade locally. The native acknowledgement
@@ -64,7 +64,13 @@
       const visible = visibleAnnotations();
       if (currentStroke) visible.push(currentStroke);
       if (currentArrow) visible.push(currentArrow);
-      if (textEntry?.value.trim()) visible.push({ kind: 'text', id: crypto.randomUUID(), x: textEntry.x, y: textEntry.y, text: textarea?.value ?? textEntry.value, color: textEntry.color, fontSize: textEntry.fontSize });
+      if (textEntry?.value.trim()) {
+        const id = textEntry.original?.id ?? crypto.randomUUID();
+        const draft: TextAnnotation = { kind: 'text', id, x: textEntry.x, y: textEntry.y, text: textarea?.value ?? textEntry.value, color: textEntry.color, fontSize: textEntry.fontSize };
+        const existing = visible.findIndex((a) => a.id === id);
+        if (existing >= 0) visible[existing] = draft; else visible.push(draft);
+        removed = removed.map((a) => a.id === id ? draft : a);
+      }
       const ids = new Set(removed.map((a) => a.id));
       removed = [...removed, ...visible.filter((a) => !ids.has(a.id))];
       const pointer = activePointer; activePointer = null;
@@ -76,6 +82,7 @@
       duration ??= settings.reduceMotion ? 0 : 350;
     }
     scene = next;
+    if (textEntry?.original && !visibleAnnotations().some((a) => a.id === textEntry?.original?.id)) textEntry = null;
     renderScene();
     if (removed.length) renderer?.fadeOut(removed, duration ?? 0);
     if (cleared) reportDiagnostic('scene');
@@ -157,13 +164,13 @@
   function down(event: PointerEvent) {
     if (!drawing || scene.revision < 0 || event.button !== 0 || activePointer !== null) return;
     error = ''; showPalette = false;
-    if (textEntry) { commitText(); return; }
     const start = point(event);
     if (tool === 'text') {
-      textEntry = { ...start, x: Math.max(10, Math.min(start.x, innerWidth - 450)), y: Math.max(80, Math.min(start.y, innerHeight - 160)), value: '', color: brush.color, fontSize: localTextSize };
-      void tick().then(() => textarea?.focus());
+      event.preventDefault();
+      void openText(start);
       return;
     }
+    if (textEntry) { void commitText(); return; }
     activePointer = event.pointerId; lastPoint = start;
     canvas.setPointerCapture(event.pointerId);
     if (tool === 'pen' || tool === 'highlighter') {
@@ -218,6 +225,27 @@
   }
   function cancelPointer(event: PointerEvent) { if (activePointer === event.pointerId) finishPointer(); }
   function chooseTool(next: Tool) { finishPointer(); commitText(); updateBrush({ tool: next }); showPalette = false; if (eraserCursor) eraserCursor.style.display = 'none'; }
+  async function openText(start: Point) {
+    const generation = scene.clearGeneration;
+    await commitText();
+    await edits;
+    if (!drawing || textEntry || scene.clearGeneration !== generation) return;
+    const original = textAtPoint(visibleAnnotations(), start);
+    textEntry = original
+      ? { x: original.x, y: original.y, value: original.text, color: original.color, fontSize: original.fontSize, original: { ...original } }
+      : { x: Math.max(10, Math.min(start.x, innerWidth - 160)), y: Math.max(80, Math.min(start.y, innerHeight - 160)), value: '', color: brush.color, fontSize: localTextSize };
+    renderScene();
+    await tick();
+    textarea?.focus();
+    if (original) textarea?.setSelectionRange(original.text.length, original.text.length);
+  }
+  function cancelText() { textEntry = null; composing = false; renderScene(); }
+  function editorWidth() {
+    if (!textEntry) return 440;
+    const sample: TextAnnotation = { kind: 'text', id: '', text: textEntry.value, ...textEntry };
+    const width = Math.max(440, ...textLineBounds(sample).map((line) => line.width + 4));
+    return Math.max(140, Math.min(width, innerWidth - textEntry.x - 10));
+  }
   function commitText(): Promise<void> {
     if (textCommit) return textCommit;
     if (!textEntry) return Promise.resolve();
@@ -233,9 +261,11 @@
       if (textEntry !== entry || disposed) return;
       if (new TextEncoder().encode(value).length > 40_000) { error = '텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요.'; editor?.focus(); return; }
       textEntry = null; composing = false;
-      if (!value.trim()) return;
-      const annotation: TextAnnotation = { kind: 'text', id: crypto.randomUUID(), x: entry.x, y: entry.y, text: value, color: entry.color, fontSize: entry.fontSize };
-      submit([annotation], []);
+      if (entry.original && value === entry.original.text) { renderScene(); return; }
+      const removed = entry.original ? [entry.original.id] : [];
+      const annotation: TextAnnotation = { kind: 'text', id: entry.original?.id ?? crypto.randomUUID(), x: entry.x, y: entry.y, text: value, color: entry.color, fontSize: entry.fontSize };
+      submit(value.trim() ? [annotation] : [], removed);
+      renderScene();
     })().finally(() => { textCommit = null; });
     return textCommit;
   }
@@ -276,7 +306,7 @@
     if (event.key === 'Escape') {
       if (performance.now() - compositionEndedAt < 50) return;
       event.preventDefault();
-      if (textEntry) { textEntry = null; return; }
+      if (textEntry) { cancelText(); return; }
       if (showPalette) { showPalette = false; return; }
       void action(() => bridge.setMode('interact')); return;
     }
@@ -351,15 +381,15 @@
       </div>
     {/snippet}
   </ToolbarFrame>
-  <div class="mode-hint"><span class="hint-dot"></span><strong>{TOOL_LABELS[tool]}</strong><span class="hint-separator"></span>{#if tool === 'text'}화면을 클릭해 입력하세요{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else if tool === 'arrow'}드래그로 연결 · Shift로 45° 방향 맞추기{:else if tool === 'highlighter'}글자를 가리지 않고 강조하세요{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
+  <div class="mode-hint"><span class="hint-dot"></span><strong>{TOOL_LABELS[tool]}</strong><span class="hint-separator"></span>{#if tool === 'text'}빈 곳에 새 글 · 기존 글을 클릭해 수정{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else if tool === 'arrow'}드래그로 연결 · Shift로 45° 방향 맞추기{:else if tool === 'highlighter'}글자를 가리지 않고 강조하세요{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
 {:else if !native}
   <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>다시 그리기</button><span>그림은 유지됩니다 · {currentDisplay?.name ?? '미리보기'}</span></div>
 {/if}
 
 {#if textEntry}
   <div class="text-editor" style:left={`${textEntry.x}px`} style:top={`${textEntry.y}px`}>
-    <textarea bind:this={textarea} bind:value={textEntry.value} aria-label="화면에 입력할 텍스트" placeholder="텍스트 입력" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
-    <div class="text-editor-actions"><span>Enter 완료 · Shift+Enter 줄바꿈</span><button aria-label="텍스트 취소" onclick={() => textEntry = null}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label="텍스트 완료" onclick={commitText}><Icon name="check" size={16} />완료</button></div>
+    <textarea bind:this={textarea} bind:value={textEntry.value} aria-label="화면에 입력할 텍스트" placeholder="텍스트 입력" wrap="off" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:width={`${editorWidth()}px`} style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
+    <div class="text-editor-actions"><span>{textEntry.original ? '수정 중 · ' : ''}Enter 완료 · Shift+Enter 줄바꿈 · Esc 취소</span><button aria-label="텍스트 취소" onclick={cancelText}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label="텍스트 완료" onclick={commitText}><Icon name="check" size={16} />완료</button></div>
   </div>
 {/if}
 {#if error}<div class="overlay-error error-box" role="alert"><span>{error}</span><button onclick={() => action(() => bridge.setMode('interact'))}>앱 조작으로 돌아가기</button><button aria-label="알림 닫기" onclick={() => error = ''}><Icon name="close" size={16} /></button></div>{/if}

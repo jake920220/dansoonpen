@@ -551,25 +551,38 @@ impl SceneStore {
         if edit.added.len() > 1000 || edit.removed_ids.len() > 100_000 {
             return Err("한 번에 편집할 수 있는 주석 수를 초과했습니다.".into());
         }
-        let mut ids: HashSet<String> = scene.items.iter().map(|a| a.id().into()).collect();
+        let ids: HashSet<&str> = scene.items.iter().map(|a| a.id()).collect();
         let removed: HashSet<&str> = edit.removed_ids.iter().map(String::as_str).collect();
         if removed.len() != edit.removed_ids.len() || !removed.iter().all(|id| ids.contains(*id)) {
             return Err("삭제 대상이 오래되었거나 중복되었습니다. 화면을 다시 불러오세요.".into());
         }
-        // IDs cannot be reused, including as replacements in the same edit.
+        // Only explicit text replacements can retain an ID. Preserve its layer
+        // and one history action; ordinary additions still require fresh IDs.
+        let mut added_ids = HashSet::new();
         for a in &edit.added {
             a.validate()?;
-            if !ids.insert(a.id().into()) {
+            let replacing_text = removed.contains(a.id())
+                && matches!(a, Annotation::Text { .. })
+                && scene.items.iter().any(|old| {
+                    old.id() == a.id() && matches!(old.as_ref(), Annotation::Text { .. })
+                });
+            if !added_ids.insert(a.id()) || (ids.contains(a.id()) && !replacing_text) {
                 return Err("중복된 주석 ID입니다.".into());
             }
         }
+        let added: Vec<_> = edit.added.into_iter().map(Arc::new).collect();
+        let replacements: HashMap<_, _> = added.iter().map(|a| (a.id(), a.clone())).collect();
         let mut after: Vec<_> = scene
             .items
             .iter()
-            .filter(|a| !removed.contains(a.id()))
-            .cloned()
+            .filter_map(|a| {
+                replacements
+                    .get(a.id())
+                    .cloned()
+                    .or_else(|| (!removed.contains(a.id())).then(|| a.clone()))
+            })
             .collect();
-        after.extend(edit.added.into_iter().map(Arc::new));
+        after.extend(added.iter().filter(|a| !ids.contains(a.id())).cloned());
         let total = self
             .scenes
             .iter()
@@ -658,6 +671,116 @@ impl SceneStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn text_note(id: &str, text: &str) -> Annotation {
+        Annotation::Text {
+            id: id.into(),
+            x: 30.,
+            y: 60.,
+            text: text.into(),
+            color: "#ffcf56".into(),
+            font_size: 40.,
+        }
+    }
+    #[test]
+    fn text_replacement_keeps_its_layer_and_undo_redo_without_ghost_fade() {
+        let mut s = SceneStore::default();
+        s.ensure("a");
+        s.apply(
+            SceneEdit {
+                display_id: "a".into(),
+                clear_generation: 0,
+                added: vec![text_note("text", "원문"), stroke("above")],
+                removed_ids: vec![],
+            },
+            350,
+        )
+        .unwrap();
+        let updates = s
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: 0,
+                    added: vec![text_note("text", "수정한 글\n두 번째 줄")],
+                    removed_ids: vec!["text".into()],
+                },
+                350,
+            )
+            .unwrap();
+        assert!(updates[0].fade_out.is_empty());
+        assert_eq!(
+            s.snapshot("a")
+                .unwrap()
+                .annotations
+                .iter()
+                .map(|a| a.id())
+                .collect::<Vec<_>>(),
+            vec!["text", "above"]
+        );
+        s.undo();
+        assert!(
+            matches!(s.snapshot("a").unwrap().annotations[0].as_ref(), Annotation::Text { text, .. } if text == "원문")
+        );
+        assert!(s.redo(350)[0].fade_out.is_empty());
+        assert!(
+            matches!(s.snapshot("a").unwrap().annotations[0].as_ref(), Annotation::Text { text, .. } if text == "수정한 글\n두 번째 줄")
+        );
+        let generation = s.snapshot("a").unwrap().clear_generation;
+        s.clear(350);
+        assert!(s
+            .apply(
+                SceneEdit {
+                    display_id: "a".into(),
+                    clear_generation: generation,
+                    added: vec![text_note("text", "늦은 수정")],
+                    removed_ids: vec!["text".into()]
+                },
+                350
+            )
+            .unwrap()
+            .is_empty());
+        assert!(s.snapshot("a").unwrap().annotations.is_empty());
+    }
+    #[test]
+    fn text_replacement_rejects_implicit_or_duplicate_ids_and_wrong_types_atomically() {
+        let mut s = SceneStore::default();
+        s.ensure("a");
+        s.apply(
+            SceneEdit {
+                display_id: "a".into(),
+                clear_generation: 0,
+                added: vec![text_note("text", "원문"), stroke("stroke")],
+                removed_ids: vec![],
+            },
+            350,
+        )
+        .unwrap();
+        for (added, removed_ids) in [
+            (vec![text_note("text", "수정")], vec![]),
+            (
+                vec![text_note("text", "수정"), text_note("text", "중복")],
+                vec!["text".into()],
+            ),
+            (vec![stroke("text")], vec!["text".into()]),
+            (
+                vec![text_note("stroke", "타입 변경")],
+                vec!["stroke".into()],
+            ),
+        ] {
+            let revision = s.snapshot("a").unwrap().revision;
+            assert!(s
+                .apply(
+                    SceneEdit {
+                        display_id: "a".into(),
+                        clear_generation: 0,
+                        added,
+                        removed_ids
+                    },
+                    350
+                )
+                .is_err());
+            assert_eq!(s.snapshot("a").unwrap().revision, revision);
+        }
+    }
     #[test]
     fn arrow_and_highlighter_validation_and_legacy_defaults() {
         let legacy = r##"{"kind":"stroke","id":"old","points":[{"x":1,"y":2}],"color":"#ffcf56","width":12}"##;

@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { StrokeAnnotation, TextAnnotation } from '../shared/types';
-import { appendStrokePoint, distanceToSegment, hitTestAnnotation, hitTestAnnotationsAlongSegment } from './geometry';
+import { appendStrokePoint, distanceToSegment, hitTestAnnotation, hitTestAnnotationsAlongSegment, textAtPoint } from './geometry';
 
 const stroke: StrokeAnnotation = { kind: 'stroke', id: 'line', points: [{ x: 50, y: 0 }, { x: 50, y: 100 }], width: 4, color: '#fff' };
 
 describe('eraser geometry', () => {
+  it('reopens the topmost text at its measured multiline bounds and ignores ink', () => {
+    const text: TextAnnotation = { kind: 'text', id: 'lower', x: 10, y: 20, fontSize: 40, text: '강의 메모\n수정', color: '#fff' };
+    const top = { ...text, id: 'upper' };
+    const measure = (line: string, size: number) => line.length * size;
+    expect(textAtPoint([text, top, stroke], { x: 50, y: 90 }, measure)?.id).toBe('upper');
+    expect(textAtPoint([text], { x: 170, y: 90 }, measure)).toBeUndefined();
+    expect(textAtPoint([stroke], { x: 50, y: 90 }, measure)).toBeUndefined();
+    expect(textAtPoint([text], { x: Number.NaN, y: 20 }, measure)).toBeUndefined();
+  });
   it('accounts for stroke thickness, round ends and isolated dots', () => {
     expect(hitTestAnnotation(stroke, { x: 55, y: 50 }, 3)).toBe(true);
     expect(hitTestAnnotation(stroke, { x: 56, y: 50 }, 3)).toBe(false);

@@ -95,6 +95,14 @@ export function textLineBounds(annotation: TextAnnotation, measure: MeasureText 
   }));
 }
 
+/** Select the topmost text, including multiline bounds, without selecting strokes. */
+export function textAtPoint(annotations: readonly Annotation[], point: Point, measure?: MeasureText): TextAnnotation | undefined {
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const annotation = annotations[i];
+    if (annotation.kind === 'text' && hitAlongSegment(annotation, point, point, 4, measure)) return annotation;
+  }
+}
+
 function hitAlongSegment(annotation: Annotation, from: Point, to: Point, radius: number, measure?: MeasureText): boolean {
   if (!isFinitePoint(from) || !isFinitePoint(to) || !Number.isFinite(radius) || radius < 0) return false;
   if (annotation.kind === 'text') {
