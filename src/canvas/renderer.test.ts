@@ -38,7 +38,7 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
       measureText: vi.fn(() => ({ fontBoundingBoxAscent: 15, fontBoundingBoxDescent: 5 })),
       stroke: vi.fn(() => draws.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha })),
     };
-    canvas = { width: 0, height: 0, style: {}, getContext: () => ctx } as unknown as HTMLCanvasElement;
+    canvas = Object.assign(new EventTarget(), { width: 0, height: 0, style: {}, getContext: () => ctx }) as unknown as HTMLCanvasElement;
     renderer = new CanvasRenderer(canvas);
   });
 
@@ -70,6 +70,41 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 127, 64);
     expect(ctx.setTransform).toHaveBeenLastCalledWith(1.25, 0, 0, 1.25, 0, 0);
     expect(() => renderer.resize(100, 100, 0)).toThrow(RangeError);
+  });
+
+  it('repaints persistent ink after context restoration without requiring another edit', () => {
+    renderer.resize(100, 50, 2);
+    renderer.setScene([stroke('kept')]);
+    frame(0);
+    expect(callbacks.size).toBe(0);
+    // The browser replaces the lost bitmap before dispatching contextrestored.
+    draws.length = 0;
+    canvas.dispatchEvent(new Event('contextlost'));
+    canvas.dispatchEvent(new Event('contextrestored'));
+    frame(10);
+    expect(draws).toEqual([{ color: '#fff', alpha: 1 }]);
+    expect(ctx.clearRect).toHaveBeenLastCalledWith(0, 0, 200, 100);
+    expect(ctx.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
+    expect(callbacks.size).toBe(0);
+  });
+
+  it('restores the latest scene and live preview without resurrecting an expired fade', () => {
+    renderer.setScene([stroke('old', '#f00')]);
+    frame(0);
+    canvas.dispatchEvent(new Event('contextlost'));
+    renderer.setScene([stroke('new', '#00f')]);
+    renderer.fadeOut([stroke('old', '#f00')], 220);
+    renderer.setPreview(stroke('in-progress', '#0f0'));
+    frame(300); // A scheduled frame can be consumed while the context is lost.
+    draws.length = 0;
+    canvas.dispatchEvent(new Event('contextrestored'));
+    canvas.dispatchEvent(new Event('contextrestored'));
+    expect(callbacks.size).toBe(1);
+    frame(310);
+    expect(draws).toEqual([{ color: '#00f', alpha: 1 }, { color: '#0f0', alpha: 1 }]);
+    renderer.dispose();
+    canvas.dispatchEvent(new Event('contextrestored'));
+    expect(callbacks.size).toBe(0);
   });
 
   it('fades only a detached snapshot while newly drawn ink remains fully opaque', () => {

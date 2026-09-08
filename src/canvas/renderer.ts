@@ -20,11 +20,15 @@ export class CanvasRenderer {
   private frame: number | null = null;
   private disposed = false;
   private dpr = 1;
+  private readonly contextRestored = () => this.schedule();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D 렌더링을 사용할 수 없습니다.');
     this.context = context;
+    // Restoring the context resets its bitmap. Persistent ink is otherwise idle,
+    // so repaint it even when no edit, resize, or fade will request another frame.
+    canvas.addEventListener('contextrestored', this.contextRestored);
   }
 
   resize(logicalWidth: number, logicalHeight: number, dpr: number): void {
@@ -97,6 +101,7 @@ export class CanvasRenderer {
   }
 
   dispose(): void {
+    this.canvas.removeEventListener('contextrestored', this.contextRestored);
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
     this.disposed = true;
