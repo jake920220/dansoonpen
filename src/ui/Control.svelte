@@ -95,6 +95,7 @@
   <main class="control-main">
     <header class="page-heading"><span>{tab === 'start' ? '설명에 필요한 만큼만.' : tab === 'settings' ? '나에게 맞는 도구로.' : '함께 만드는 작은 도구.'}</span><span class="local-label">{native ? '오프라인으로 작동' : '브라우저 미리보기'}</span></header>
     {#if error || appState?.error}<div class="error-box" role="alert">{error || appState?.error}</div>{/if}
+    {#if appState?.clearUndoToken != null}<div class="session-actions"><button class="secondary" onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={18} />방금 지운 필기 되돌리기</button></div>{/if}
     {#if tab === 'start'}
       <section class="welcome">
         <div class="eyebrow">YOUR SCREEN, YOUR CANVAS</div>

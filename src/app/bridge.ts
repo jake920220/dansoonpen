@@ -34,6 +34,7 @@ export const bridge = {
   clearCurrent: () => call<void>('clear_current'),
   clearAll: () => call<void>('clear_all'),
   undo: () => call<void>('undo'),
+  undoClear: (token: number) => call<void>('undo_clear', { token }),
   redo: () => call<void>('redo'),
   showControl: () => call<void>('show_control'),
   quit: () => call<void>('quit_app'),

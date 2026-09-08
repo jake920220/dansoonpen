@@ -73,3 +73,5 @@
 .text-format label { display: flex; align-items: center; gap: 4px; }
 .text-format input { width: 58px; color: #e8eef8; background: #171e28; border: 1px solid #69758a; padding: 4px; border-radius: 4px; }
 .text-editor-actions { flex-wrap: wrap; }
+
+.toolbar button.clear-undo { color: #ffcf56; border-color: #ffcf5677; gap: 5px; font-size: 11px; }

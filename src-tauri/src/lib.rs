@@ -32,6 +32,7 @@ struct TrayShortcuts {
     clear: MenuItem<tauri::Wry>,
     visibility: MenuItem<tauri::Wry>,
     cursor: MenuItem<tauri::Wry>,
+    undo_clear: MenuItem<tauri::Wry>,
 }
 impl TrayShortcuts {
     fn update(&self, settings: &AppSettings) -> tauri::Result<()> {
@@ -111,7 +112,33 @@ fn label(id: &str) -> String {
     });
     format!("overlay-{hash:016x}")
 }
+fn feedback(data: &mut RuntimeState, message: &str) {
+    data.app.feedback = Some(Feedback {
+        id: data.app.revision + 1,
+        message: message.into(),
+        created_at_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+    });
+}
+fn invalidate_clear_undo(app: &tauri::AppHandle, data: &mut RuntimeState) {
+    if data
+        .app
+        .clear_undo_token
+        .is_some_and(|token| token != data.scenes.history_revision())
+    {
+        data.app.clear_undo_token = None;
+        emit_state(app, data);
+    }
+}
 fn emit_state(app: &tauri::AppHandle, data: &mut RuntimeState) {
+    if let Some(tray) = app.try_state::<TrayShortcuts>() {
+        let _ = tray
+            .undo_clear
+            .set_enabled(data.app.clear_undo_token.is_some());
+    }
+
     if let Some(tray) = app.try_state::<TrayShortcuts>() {
         let _ = tray.visibility.set_text(if data.app.annotations_visible {
             "필기 잠시 숨기기"
@@ -236,6 +263,15 @@ fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
     }
 }
 fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> Result<(), String> {
+    change_mode_with_feedback(app, data, mode, true)
+}
+fn change_mode_with_feedback(
+    app: &tauri::AppHandle,
+    data: &mut RuntimeState,
+    mode: Mode,
+    announce: bool,
+) -> Result<(), String> {
+    let changed_mode = data.app.mode != mode;
     diagnostics::record(app, "mode.begin", json!({"from":data.app.mode,"to":mode}));
     let result = (|| {
         diagnostics::record(app, "mode.step", json!({"step":"release_inputs"}));
@@ -268,6 +304,16 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
     match result {
         Ok(()) => {
             data.app.complete_mode(mode);
+            if changed_mode && announce {
+                feedback(
+                    data,
+                    if mode == Mode::Draw {
+                        "그리기 시작 · 기본 펜"
+                    } else {
+                        "앱 조작 가능 · 필기는 유지됩니다"
+                    },
+                );
+            }
             data.app.error = None;
             emit_state(app, data);
             diagnostics::state(app, data, "mode_complete");
@@ -278,6 +324,7 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             let _ = release_inputs(app);
             let _ = data.previous_focus.restore();
             data.app.mode = Mode::Interact;
+            data.app.feedback = None;
             data.app.error = Some(e.clone());
             emit_state(app, data);
             diagnostics::state(app, data, "mode_failed");
@@ -374,10 +421,25 @@ fn clear_scope_and_interact(
     } else {
         data.scenes.clear(duration)
     };
+    let removed_count: usize = updates.iter().map(|update| update.fade_out.len()).sum();
     emit_scenes(app, updates);
+    data.app.clear_undo_token = if removed_count > 0 {
+        data.scenes.undo_token()
+    } else {
+        None
+    };
     if data.app.mode == Mode::Draw {
-        change_mode(app, data, Mode::Interact)?;
+        change_mode_with_feedback(app, data, Mode::Interact, false)?;
     }
+    feedback(
+        data,
+        if removed_count > 0 {
+            "필기를 지웠습니다"
+        } else {
+            "지울 필기가 없습니다"
+        },
+    );
+    emit_state(app, data);
     diagnostics::state(app, data, "clear_complete");
     diagnostics::record(app, "clear.end", json!({"ok":true}));
     Ok(())
@@ -736,6 +798,7 @@ async fn apply_edit(
         let duration = fade(&d);
         let updates = d.scenes.apply(edit, duration)?;
         emit_scenes(&app, updates);
+        invalidate_clear_undo(&app, &mut d);
         d.scenes.snapshot(&id)
     })
     .await
@@ -765,6 +828,39 @@ async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(
     })
     .await
 }
+fn restore_clear(
+    app: &tauri::AppHandle,
+    data: &mut RuntimeState,
+    token: u64,
+) -> Result<(), String> {
+    if data.app.clear_undo_token != Some(token) || data.scenes.history_revision() != token {
+        invalidate_clear_undo(app, data);
+        return Err(
+            "새 작업이 있어 이전 삭제를 바로 되돌릴 수 없습니다. 실행 취소를 사용해 주세요.".into(),
+        );
+    }
+    let updates = data.scenes.undo_if_unchanged(token);
+    data.app.clear_undo_token = None;
+    data.app.annotations_visible = true;
+    emit_scenes(app, updates);
+    feedback(data, "지운 필기를 되돌렸습니다");
+    emit_state(app, data);
+    Ok(())
+}
+#[tauri::command]
+async fn undo_clear(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    token: u64,
+) -> Result<(), String> {
+    native_command(app.clone(), "undo_clear", move || {
+        authorized(&window)?;
+        let state = lock(&app);
+        let mut data = state.0.lock().map_err(|e| e.to_string())?;
+        restore_clear(&app, &mut data, token)
+    })
+    .await
+}
 #[tauri::command]
 async fn undo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
     native_command(app.clone(), "undo", move || {
@@ -772,6 +868,7 @@ async fn undo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
         emit_scenes(&app, d.scenes.undo());
+        invalidate_clear_undo(&app, &mut d);
         Ok(())
     })
     .await
@@ -784,6 +881,7 @@ async fn redo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
         let duration = fade(&d);
         emit_scenes(&app, d.scenes.redo(duration));
+        invalidate_clear_undo(&app, &mut d);
         Ok(())
     })
     .await
@@ -845,6 +943,13 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         true,
         Some(&settings.clear_shortcut),
     )?;
+    let undo_clear_item = MenuItem::with_id(
+        app,
+        "undo-clear",
+        "방금 지운 필기 되돌리기",
+        false,
+        None::<&str>,
+    )?;
     let cursor = MenuItem::with_id(app, "cursor", "커서 강조 켜기", true, None::<&str>)?;
     let clear_current_item = MenuItem::with_id(
         app,
@@ -873,6 +978,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
             &cursor,
             &clear_current_item,
             &clear,
+            &undo_clear_item,
             &quit,
         ],
     )?;
@@ -901,6 +1007,13 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                 let state = lock(app);
                 if let Ok(mut d) = state.0.lock() {
                     match event_id.as_str() {
+                        "undo-clear" => {
+                            if let Some(token) = d.app.clear_undo_token {
+                                if let Err(e) = restore_clear(app, &mut d, token) {
+                                    report(app, &mut d, e);
+                                }
+                            }
+                        }
                         "draw" => {
                             let _ = change_mode(app, &mut d, Mode::Draw);
                         }
@@ -930,6 +1043,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         })
         .build(app)?;
     app.manage(TrayShortcuts {
+        undo_clear: undo_clear_item,
         draw,
         clear,
         visibility,
@@ -1025,6 +1139,7 @@ pub fn run() {
             get_scene,
             apply_edit,
             clear_all,
+            undo_clear,
             clear_current,
             toggle_annotations,
             toggle_cursor,
@@ -1063,6 +1178,7 @@ pub fn run() {
             };
             app.manage(Session(Mutex::new(RuntimeState {
                 app: AppState {
+                    feedback: None, clear_undo_token: None,
                     brush_generation: 0,
                     cursor_enabled: false,
                     annotations_visible: true,

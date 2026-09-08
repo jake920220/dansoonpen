@@ -431,7 +431,16 @@ pub struct DisplayInfo {
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Feedback {
+    pub id: u64,
+    pub message: String,
+    pub created_at_ms: u64,
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppState {
+    pub feedback: Option<Feedback>,
+    pub clear_undo_token: Option<u64>,
     pub brush_generation: u64,
     pub cursor_enabled: bool,
     pub annotations_visible: bool,
@@ -507,11 +516,25 @@ struct Action {
 }
 #[derive(Default)]
 pub struct SceneStore {
+    history_revision: u64,
     scenes: HashMap<String, Scene>,
     undo: VecDeque<Action>,
     redo: Vec<Action>,
 }
 impl SceneStore {
+    pub fn history_revision(&self) -> u64 {
+        self.history_revision
+    }
+    pub fn undo_token(&self) -> Option<u64> {
+        (!self.undo.is_empty()).then_some(self.history_revision)
+    }
+    pub fn undo_if_unchanged(&mut self, token: u64) -> Vec<SceneUpdate> {
+        if token != self.history_revision {
+            return vec![];
+        }
+        self.undo()
+    }
+
     pub fn ensure(&mut self, id: &str) {
         self.scenes.entry(id.into()).or_default();
     }
@@ -528,6 +551,7 @@ impl SceneStore {
         if changes.is_empty() {
             return vec![];
         }
+        self.history_revision += 1;
         let updates = self.install(&changes, false, fade);
         // Conservative accounting includes all retained references and annotation payloads.
         // Arc shares actual payloads between the live scene and every history snapshot.
@@ -693,6 +717,7 @@ impl SceneStore {
     }
     pub fn undo(&mut self) -> Vec<SceneUpdate> {
         if let Some(a) = self.undo.pop_back() {
+            self.history_revision += 1;
             let updates = self.install(&a.changes, true, 0);
             self.redo.push(a);
             updates
@@ -702,6 +727,7 @@ impl SceneStore {
     }
     pub fn redo(&mut self, fade: u32) -> Vec<SceneUpdate> {
         if let Some(a) = self.redo.pop() {
+            self.history_revision += 1;
             let updates = self.install(&a.changes, false, fade);
             self.undo.push_back(a);
             updates
@@ -721,6 +747,8 @@ mod tests {
             ..Default::default()
         };
         let mut state = AppState {
+            feedback: None,
+            clear_undo_token: None,
             brush_generation: 0,
             cursor_enabled: false,
             annotations_visible: true,
@@ -784,6 +812,30 @@ mod tests {
             color: "#ffcf56".into(),
             font_size: 40.,
         }
+    }
+    #[test]
+    fn clear_receipt_restores_all_displays_once_and_cannot_undo_new_work() {
+        let mut store = SceneStore::default();
+        store.ensure("a");
+        store.ensure("b");
+        add(&mut store, "a", "old-a");
+        add(&mut store, "b", "old-b");
+        store.clear(350);
+        let receipt = store.undo_token().unwrap();
+        let restored = store.undo_if_unchanged(receipt);
+        assert_eq!(restored.len(), 2);
+        assert_eq!(store.snapshot("a").unwrap().annotations[0].id(), "old-a");
+        assert_eq!(store.snapshot("b").unwrap().annotations[0].id(), "old-b");
+        assert!(store.undo_if_unchanged(receipt).is_empty());
+        store.clear(350);
+        let receipt = store.undo_token().unwrap();
+        add(&mut store, "a", "fresh");
+        assert!(store.undo_if_unchanged(receipt).is_empty());
+        assert_eq!(store.snapshot("a").unwrap().annotations[0].id(), "fresh");
+        store.undo();
+        store.redo(350);
+        assert!(store.undo_if_unchanged(receipt).is_empty());
+        assert_eq!(store.snapshot("a").unwrap().annotations[0].id(), "fresh");
     }
     #[test]
     fn text_position_and_style_are_one_undoable_replacement() {

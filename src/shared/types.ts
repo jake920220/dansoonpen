@@ -24,7 +24,9 @@ export interface DisplayInfo {
   id: string; name: string; x: number; y: number; width: number; height: number;
   scaleFactor: number; isPrimary: boolean; connected: boolean;
 }
+export interface Feedback { id: number; message: string; createdAtMs: number }
 export interface AppState {
+  feedback: Feedback | null; clearUndoToken: number | null;
   brushGeneration: number;
   cursorEnabled: boolean; annotationsVisible: boolean; mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
   settings: AppSettings; brush: BrushSettings; revision: number; error: string | null;

@@ -13,6 +13,7 @@ Commands (Tauri invoke):
 - `get_scene { displayId }` -> SceneSnapshot
 - `apply_edit { edit: SceneEdit }` -> SceneSnapshot; add/remove as one undoable edit
 - `clear_all` -> void; remove existing annotations from all displays in one undoable action, then leave draw mode and release input/restore prior app focus immediately while the fade continues. Advance clear generation before publishing the mode change. The global clear shortcut and tray call the same native routine. If already interacting, preserve current app focus.
+- `undo_clear { token }` -> void; restore the issued clear only while its history revision is unchanged. Preserve mode/focus and reject after any new edit/undo/redo.
 - `undo` / `redo` -> void; global chronological undo, including all-monitor clear
 - `show_control` -> void
 - `quit_app` -> void
@@ -49,3 +50,5 @@ V0.2 adds arrows and highlighter strokes. `stroke.opacity` defaults to 1 for old
 macOS는 NSWindow의 `mouseLocationOutsideOfEventStream`과 `CGEventSourceCounterForEventType`(현재 세션의 왼쪽 클릭 횟수)을 사용한다. 이벤트 주입·이벤트 탭·화면 캡처·키 입력 수집은 없다. AppKit의 창 좌표를 사용해 서로 다른 배율의 바탕화면 원점 환산을 피한다. Windows는 GetCursorPos와 GetAsyncKeyState의 현재 왼쪽 버튼 상태를 읽는다. Windows의 빠른 클릭 누락·좌표·입력은 실제 PC 검증을 기다린다.
 
 참고: [Apple 창 내부 마우스 위치](https://developer.apple.com/documentation/appkit/nswindow/mouselocationoutsideofeventstream), [Apple Quartz 이벤트 함수](https://developer.apple.com/documentation/coregraphics/core-graphics-functions), [Microsoft GetCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getcursorpos).
+
+AppState.feedback carries a native-completed action ID, message and creation timestamp. The UI expires notices after 3.5 seconds without another IPC or window. Interact notices remain click-through; clear recovery is available from the existing tray/control, or toolbar while drawing. clearUndoToken is invalidated by scene history changes.

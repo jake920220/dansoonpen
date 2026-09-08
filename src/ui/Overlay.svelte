@@ -10,6 +10,7 @@
   import CursorHighlight from './CursorHighlight.svelte';
   import ColorPalette from './ColorPalette.svelte';
   import SizeControl from './SizeControl.svelte';
+  import FeedbackNotice from './FeedbackNotice.svelte';
   import { toolSize, sizePatch, stepSize } from '../shared/tool-size';
   import { constrainTextEditor, textDraftChanged, type TextDraft } from './text-edit';
   import { SettingsWriter } from '../app/settings-writer';
@@ -384,6 +385,9 @@
 
 {#if appState?.cursorEnabled && appState.activeDisplayId === displayId}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
 
+{#if appState?.activeDisplayId === displayId}
+  <FeedbackNotice feedback={appState.feedback} undoToken={appState.clearUndoToken} interactive={drawing || !native} reduceMotion={settings.reduceMotion} onundo={(token) => action(() => bridge.undoClear(token))} />
+{/if}
 {#if drawing}
   <div class="draw-frame" aria-hidden="true"></div>
   <ToolbarFrame {displayId} showPanel={showPalette} oncollapse={() => showPalette = false} oninteract={() => action(() => bridge.setMode('interact'))}>
@@ -410,6 +414,7 @@
         {#if detailed}<button aria-label="이 화면만 지우기" title="이 화면만 지우고 앱 조작으로 복귀" onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>{/if}
         <button aria-label="전체 지우기" title={`전체 지우기 (${shortcutLabel(settings.clearShortcut)})`} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
       </div>
+      {#if appState?.clearUndoToken != null}<button class="clear-undo" aria-label="방금 지운 필기 되돌리기" onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={17} />삭제 복구</button>{/if}
       <span class="toolbar-divider"></span>
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
       {#if detailed || appState?.cursorEnabled}<button aria-label="커서 강조" aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title="커서 강조 켜기/끄기 (C)" onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>{/if}
