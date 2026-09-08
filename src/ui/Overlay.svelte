@@ -387,32 +387,36 @@
 {#if drawing}
   <div class="draw-frame" aria-hidden="true"></div>
   <ToolbarFrame {displayId} showPanel={showPalette} oncollapse={() => showPalette = false} oninteract={() => action(() => bridge.setMode('interact'))}>
+    {#snippet children(detailed: boolean)}
       <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
       <div class="tool-group">
         <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title="펜 (P)" aria-label="펜" onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
-        <button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title="형광펜 (H)" aria-label="형광펜" onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>
-        <button class:chosen={tool === 'arrow'} aria-pressed={tool === 'arrow'} title="화살표 (A) · Shift로 방향 맞추기" aria-label="화살표" onclick={() => chooseTool('arrow')}><Icon name="arrow" /></button>
+        {#if detailed || tool === 'highlighter'}<button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title="형광펜 (H)" aria-label="형광펜" onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>{/if}
+        {#if detailed || tool === 'arrow'}<button class:chosen={tool === 'arrow'} aria-pressed={tool === 'arrow'} title="화살표 (A) · Shift로 방향 맞추기" aria-label="화살표" onclick={() => chooseTool('arrow')}><Icon name="arrow" /></button>{/if}
         <button class:chosen={tool === 'eraser'} aria-pressed={tool === 'eraser'} title="지우개 (E) · 획 단위로 지우기" aria-label="지우개" onclick={() => chooseTool('eraser')}><Icon name="eraser" /></button>
         <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
       <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={editingBrush.color}></span><span class="current-size">{toolSize(editingBrush)}px</span></button>
+      {#if detailed}
       <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
         {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
       </div>
+      {/if}
       <span class="toolbar-divider"></span>
       <div class="tool-group">
         <button aria-label="실행 취소" title="실행 취소 (⌘/Ctrl+Z)" onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
-        <button aria-label="다시 실행" title="다시 실행 (⌘/Ctrl+Shift+Z)" onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>
-        <button aria-label="이 화면만 지우기" title="이 화면만 지우고 앱 조작으로 복귀" onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>
+        {#if detailed}<button aria-label="다시 실행" title="다시 실행 (⌘/Ctrl+Shift+Z)" onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>{/if}
+        {#if detailed}<button aria-label="이 화면만 지우기" title="이 화면만 지우고 앱 조작으로 복귀" onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>{/if}
         <button aria-label="전체 지우기" title={`전체 지우기 (${shortcutLabel(settings.clearShortcut)})`} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
       </div>
       <span class="toolbar-divider"></span>
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
-      <button aria-label="커서 강조" aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title="커서 강조 켜기/끄기 (C)" onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>
-      <button aria-label="필기 잠시 숨기기" title={`필기 잠시 숨기기 (${shortcutLabel(settings.visibilityShortcut)})`} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>
-      <button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
+      {#if detailed || appState?.cursorEnabled}<button aria-label="커서 강조" aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title="커서 강조 켜기/끄기 (C)" onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>{/if}
+      {#if detailed}<button aria-label="필기 잠시 숨기기" title={`필기 잠시 숨기기 (${shortcutLabel(settings.visibilityShortcut)})`} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>{/if}
+      {#if detailed}<button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>{/if}
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
+    {/snippet}
     {#snippet panel()}
       <div class="palette-panel">
         {#if tool !== 'eraser'}<div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{editingBrush.color.toUpperCase()}</code></div>

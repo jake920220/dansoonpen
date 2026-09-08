@@ -3,7 +3,7 @@
   import Icon from './Icon.svelte';
   import { DEFAULT_POSITION, readPosition, toolbarBounds } from './toolbar-position';
   let { displayId, children, panel, showPanel, oncollapse, oninteract }: {
-    displayId: string; children: Snippet; panel: Snippet; showPanel: boolean;
+    displayId: string; children: Snippet<[boolean]>; panel: Snippet; showPanel: boolean;
     oncollapse: () => void; oninteract: () => void;
   } = $props();
   let position = $state({ ...DEFAULT_POSITION });
@@ -31,7 +31,7 @@
   }
   function move(e: PointerEvent) { if (drag?.id === e.pointerId) place(drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y); }
   function end(e: PointerEvent) { if (drag?.id === e.pointerId) { drag = null; save(); } }
-  function reset() { position = { ...DEFAULT_POSITION, collapsed: position.collapsed }; save(); }
+  function reset() { position = { ...DEFAULT_POSITION, collapsed: position.collapsed, detailed: position.detailed }; save(); }
   function keyboard(e: KeyboardEvent) {
     if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); reset(); return; }
     const directions: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -49,7 +49,8 @@
 <div class="toolbar-area" style:left={`${left}px`} style:top={`${top}px`}>
   <div class="toolbar" bind:this={bar} bind:clientWidth={width} bind:clientHeight={height} role="toolbar" aria-label="그리기 도구">
     <button class="toolbar-grip" aria-label="도구막대 이동" title="드래그로 이동 · 방향키 이동 · 두 번 클릭 또는 Home으로 위치 초기화" onpointerdown={start} onpointermove={move} onpointerup={end} onpointercancel={end} onlostpointercapture={end} ondblclick={reset} onkeydown={keyboard}><Icon name="grip" size={16} /></button>
-    {#if !position.collapsed}{@render children()}{:else}
+    {#if !position.collapsed}{@render children(position.detailed)}
+      <button aria-label={position.detailed ? '간단히 보기' : '도구 더보기'} aria-expanded={position.detailed} title={position.detailed ? '자주 쓰는 도구만 표시' : '형광펜·화살표·프리셋·추가 도구'} onclick={() => { position.detailed = !position.detailed; oncollapse(); save(); }}><Icon name="more" size={18} /></button>{:else}
       <span class="compact-label">My Brush</span>
       <button aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={oninteract}><Icon name="pointer" size={18} /></button>
     {/if}
