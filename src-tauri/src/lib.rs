@@ -257,10 +257,22 @@ async fn toggle_annotations(window: WebviewWindow, app: tauri::AppHandle) -> Res
     .await
 }
 fn clear_and_interact(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    clear_scope_and_interact(app, data, None)
+}
+fn clear_scope_and_interact(
+    app: &tauri::AppHandle,
+    data: &mut RuntimeState,
+    display: Option<String>,
+) -> Result<(), String> {
     let duration = fade(data);
     // Advance the clear generation before mode-exit handlers can submit a final edit.
     // Keep the overlay visible so its existing fade can finish after input is released.
-    emit_scenes(app, data.scenes.clear(duration));
+    let updates = if let Some(id) = display {
+        data.scenes.clear_display(&id, duration)?
+    } else {
+        data.scenes.clear(duration)
+    };
+    emit_scenes(app, updates);
     if data.app.mode == Mode::Draw {
         change_mode(app, data, Mode::Interact)?;
     }
@@ -612,6 +624,21 @@ async fn clear_all(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), S
     .await
 }
 #[tauri::command]
+async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let state = lock(&app);
+        let mut data = state.0.lock().map_err(|e| e.to_string())?;
+        let id = data
+            .app
+            .active_display_id
+            .clone()
+            .ok_or("연결된 화면이 없습니다.")?;
+        clear_scope_and_interact(&app, &mut data, Some(id))
+    })
+    .await
+}
+#[tauri::command]
 async fn undo(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
     native_command(app.clone(), move || {
         authorized(&window)?;
@@ -691,6 +718,13 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         true,
         Some(&settings.clear_shortcut),
     )?;
+    let clear_current_item = MenuItem::with_id(
+        app,
+        "clear-current",
+        "선택한 화면 필기 지우기",
+        true,
+        None::<&str>,
+    )?;
     let visibility = MenuItem::with_id(
         app,
         "visibility",
@@ -703,7 +737,15 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "My Brush 종료", true, quit_shortcut)?;
     let menu = Menu::with_items(
         app,
-        &[&control, &draw, &interact, &visibility, &clear, &quit],
+        &[
+            &control,
+            &draw,
+            &interact,
+            &visibility,
+            &clear_current_item,
+            &clear,
+            &quit,
+        ],
     )?;
     TrayIconBuilder::with_id("brush")
         .tooltip("My Brush — 화면 필기")
@@ -736,6 +778,11 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                         }
                         "visibility" => {
                             let _ = toggle_visibility(app, &mut d);
+                        }
+                        "clear-current" => {
+                            if let Some(id) = d.app.active_display_id.clone() {
+                                let _ = clear_scope_and_interact(app, &mut d, Some(id));
+                            }
                         }
                         "clear" => {
                             let _ = clear_and_interact(app, &mut d);
@@ -829,6 +876,7 @@ pub fn run() {
             get_scene,
             apply_edit,
             clear_all,
+            clear_current,
             toggle_annotations,
             undo,
             redo,

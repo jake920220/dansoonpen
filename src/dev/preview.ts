@@ -59,6 +59,7 @@ export const preview = {
         result = updateScene([...scene.annotations.filter((a) => !edit.removedIds.includes(a.id)), ...edit.added]); break;
       }
       case 'toggle_annotations': state.annotationsVisible = !state.annotationsVisible; if (!state.annotationsVisible) state.mode = 'interact'; result = updateState(); break;
+      case 'clear_current':
       case 'clear_all':
         if (scene.annotations.length) { history.push(scene.annotations); future = []; }
         scene.clearGeneration++;

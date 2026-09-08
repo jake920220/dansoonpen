@@ -11,6 +11,7 @@
     eraser: 'm15 3 6 6-11 11H5l-3-3a2 2 0 0 1 0-3L13 3a1.5 1.5 0 0 1 2 0ZM7 9l8 8M10 20h11',
     undo: 'M8 4 3 9l5 5M3 9h11a6 6 0 0 1 0 12h-2',
     redo: 'm16 4 5 5-5 5M21 9H10a6 6 0 0 0 0 12h2',
+    'clear-screen': 'M3 4h18v13H3zM8 21h8M12 17v4M9 7l6 7m-6 0 6-7',
     clear: 'M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6',
     pointer: 'm5 3 14 10-7 1-3 7-4-18Z',
     settings: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6',

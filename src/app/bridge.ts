@@ -28,6 +28,7 @@ export const bridge = {
   getScene: (displayId: string) => call<SceneSnapshot>('get_scene', { displayId }),
   applyEdit: (edit: SceneEdit) => call<SceneSnapshot>('apply_edit', { edit }),
   toggleAnnotations: () => call<void>('toggle_annotations'),
+  clearCurrent: () => call<void>('clear_current'),
   clearAll: () => call<void>('clear_all'),
   undo: () => call<void>('undo'),
   redo: () => call<void>('redo'),

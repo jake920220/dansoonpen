@@ -426,6 +426,7 @@ pub struct SceneEdit {
 }
 #[derive(Default)]
 struct Scene {
+    clear_generation: u64,
     revision: u64,
     items: Vec<Arc<Annotation>>,
 }
@@ -440,7 +441,6 @@ struct Action {
 }
 #[derive(Default)]
 pub struct SceneStore {
-    clear_generation: u64,
     scenes: HashMap<String, Scene>,
     undo: VecDeque<Action>,
     redo: Vec<Action>,
@@ -453,7 +453,7 @@ impl SceneStore {
         let s = self.scenes.get(id).ok_or("알 수 없는 화면입니다.")?;
         Ok(SceneSnapshot {
             display_id: id.into(),
-            clear_generation: self.clear_generation,
+            clear_generation: s.clear_generation,
             revision: s.revision,
             annotations: s.items.clone(),
         })
@@ -502,7 +502,7 @@ impl SceneStore {
                 SceneUpdate {
                     scene: SceneSnapshot {
                         display_id: c.display.clone(),
-                        clear_generation: self.clear_generation,
+                        clear_generation: scene.clear_generation,
                         revision: scene.revision,
                         annotations: scene.items.clone(),
                     },
@@ -513,21 +513,20 @@ impl SceneStore {
             .collect()
     }
     pub fn apply(&mut self, edit: SceneEdit, fade: u32) -> Result<Vec<SceneUpdate>, String> {
-        // A clear is also a barrier for edits already in flight from a webview.
-        // Discard old additions AND deletions before resolving their object IDs.
-        if edit.clear_generation < self.clear_generation {
+        let scene = self
+            .scenes
+            .get(&edit.display_id)
+            .ok_or("알 수 없는 화면입니다.")?;
+        // Clear barriers are display-local: pending edits on other screens survive.
+        if edit.clear_generation < scene.clear_generation {
             return Ok(vec![]);
         }
-        if edit.clear_generation > self.clear_generation {
+        if edit.clear_generation > scene.clear_generation {
             return Err("필기 세대가 현재 화면보다 앞섭니다. 화면을 다시 불러오세요.".into());
         }
         if edit.added.len() > 1000 || edit.removed_ids.len() > 100_000 {
             return Err("한 번에 편집할 수 있는 주석 수를 초과했습니다.".into());
         }
-        let scene = self
-            .scenes
-            .get(&edit.display_id)
-            .ok_or("알 수 없는 화면입니다.")?;
         let mut ids: HashSet<String> = scene.items.iter().map(|a| a.id().into()).collect();
         let removed: HashSet<&str> = edit.removed_ids.iter().map(String::as_str).collect();
         if removed.len() != edit.removed_ids.len() || !removed.iter().all(|id| ids.contains(*id)) {
@@ -574,40 +573,43 @@ impl SceneStore {
         ))
     }
     pub fn clear(&mut self, fade: u32) -> Vec<SceneUpdate> {
-        self.clear_generation += 1;
-        // Empty native scenes may still have uncommitted strokes/text in the webview.
-        // They need a fresh revision and generation event, but no empty undo action.
-        let empty_displays: Vec<_> = self
-            .scenes
-            .iter()
-            .filter(|(_, scene)| scene.items.is_empty())
-            .map(|(id, _)| id.clone())
-            .collect();
-        let changes = self
-            .scenes
-            .iter()
-            .filter(|(_, s)| !s.items.is_empty())
-            .map(|(id, s)| Change {
-                display: id.clone(),
-                before: s.items.clone(),
-                after: vec![],
-            })
-            .collect();
-        let mut updates = self.commit(changes, fade);
-        for id in empty_displays {
-            let scene = self.scenes.get_mut(&id).expect("known empty scene");
-            scene.revision += 1;
-            updates.push(SceneUpdate {
-                scene: SceneSnapshot {
-                    display_id: id,
-                    clear_generation: self.clear_generation,
-                    revision: scene.revision,
-                    annotations: vec![],
-                },
-                fade_out: vec![],
-                fade_duration_ms: fade,
-            });
+        self.clear_displays(self.scenes.keys().cloned().collect(), fade)
+    }
+    pub fn clear_display(&mut self, id: &str, fade: u32) -> Result<Vec<SceneUpdate>, String> {
+        if !self.scenes.contains_key(id) {
+            return Err("알 수 없는 화면입니다.".into());
         }
+        Ok(self.clear_displays(vec![id.into()], fade))
+    }
+    fn clear_displays(&mut self, ids: Vec<String>, fade: u32) -> Vec<SceneUpdate> {
+        let mut changes = Vec::new();
+        let mut empty_updates = Vec::new();
+        for id in ids {
+            let scene = self.scenes.get_mut(&id).expect("known display");
+            scene.clear_generation += 1;
+            if scene.items.is_empty() {
+                // An empty native scene may have an in-flight stroke in its webview.
+                scene.revision += 1;
+                empty_updates.push(SceneUpdate {
+                    scene: SceneSnapshot {
+                        display_id: id,
+                        clear_generation: scene.clear_generation,
+                        revision: scene.revision,
+                        annotations: vec![],
+                    },
+                    fade_out: vec![],
+                    fade_duration_ms: fade,
+                });
+            } else {
+                changes.push(Change {
+                    display: id,
+                    before: scene.items.clone(),
+                    after: vec![],
+                });
+            }
+        }
+        let mut updates = self.commit(changes, fade);
+        updates.extend(empty_updates);
         updates
     }
     pub fn undo(&mut self) -> Vec<SceneUpdate> {
@@ -698,7 +700,7 @@ mod tests {
         }
     }
     fn add(store: &mut SceneStore, display: &str, id: &str) {
-        let generation = store.clear_generation;
+        let generation = store.snapshot(display).unwrap().clear_generation;
         store
             .apply(
                 SceneEdit {
@@ -710,6 +712,52 @@ mod tests {
                 350,
             )
             .unwrap();
+    }
+    #[test]
+    fn scoped_clear_preserves_other_display_pending_edits_and_history() {
+        let mut s = SceneStore::default();
+        s.ensure("a");
+        s.ensure("b");
+        add(&mut s, "a", "a1");
+        add(&mut s, "b", "b1");
+        let b = s.snapshot("b").unwrap();
+        let updates = s.clear_display("a", 350).unwrap();
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].fade_out[0].id(), "a1");
+        assert_eq!(s.snapshot("b").unwrap().revision, b.revision);
+        assert_eq!(
+            s.snapshot("b").unwrap().clear_generation,
+            b.clear_generation
+        );
+        s.apply(
+            SceneEdit {
+                display_id: "b".into(),
+                clear_generation: b.clear_generation,
+                added: vec![stroke("b2")],
+                removed_ids: vec![],
+            },
+            0,
+        )
+        .unwrap();
+        assert_eq!(s.snapshot("b").unwrap().annotations.len(), 2);
+        s.undo(); // b2
+        let restored = s.undo(); // only a
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].scene.display_id, "a");
+        assert_eq!(restored[0].scene.annotations[0].id(), "a1");
+        assert_eq!(restored[0].scene.clear_generation, 1);
+        assert_eq!(s.snapshot("b").unwrap().annotations[0].id(), "b1");
+        s.redo(350); // clear a again
+        assert!(s.snapshot("a").unwrap().annotations.is_empty());
+        let revision = s.snapshot("a").unwrap().revision;
+        let empty = s.clear_display("a", 0).unwrap();
+        assert_eq!(empty[0].scene.revision, revision + 1);
+        assert_eq!(empty[0].scene.clear_generation, 2);
+        assert!(s.clear_display("missing", 0).is_err());
+        let all = s.clear(350);
+        assert_eq!(all.len(), 2);
+        assert_eq!(s.snapshot("a").unwrap().clear_generation, 3);
+        assert_eq!(s.snapshot("b").unwrap().clear_generation, 1);
     }
     #[test]
     fn cross_display_clear_is_one_action_and_preserves_arc() {

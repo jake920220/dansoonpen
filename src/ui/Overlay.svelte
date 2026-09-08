@@ -303,6 +303,7 @@
       <div class="tool-group">
         <button aria-label="실행 취소" title="실행 취소 (⌘/Ctrl+Z)" onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
         <button aria-label="다시 실행" title="다시 실행 (⌘/Ctrl+Shift+Z)" onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>
+        <button aria-label="이 화면만 지우기" title="이 화면만 지우고 앱 조작으로 복귀" onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>
         <button aria-label="전체 지우기" title={`전체 지우기 (${shortcutLabel(settings.clearShortcut)})`} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
       </div>
       <span class="toolbar-divider"></span>

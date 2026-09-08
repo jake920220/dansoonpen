@@ -35,3 +35,7 @@ V0.2 adds arrows and highlighter strokes. `stroke.opacity` defaults to 1 for old
 ## 필기 임시 숨김
 
 `AppState.annotationsVisible`은 세션 표시 상태다. `toggle_annotations`는 주석과 undo/redo를 건드리지 않는다. 숨기기는 입력을 해제하고, 복원은 앱 포커스를 바꾸지 않는다. 그리기 진입은 표시 상태를 복원한다. 설정의 `visibilityShortcut`(macOS Option+V / Windows Alt+Shift+V)은 빈 문자열로 해제할 수 있다. 이전 설정에 같은 조합을 이미 배정했다면 새 단축키만 비활성으로 마이그레이션한다. 숨겨진 동안 clear/undo가 이루어지면 최신 장면이 복원된다.
+
+## 선택한 화면 삭제
+
+`clear_current`는 현재 선택한 모니터만 수동 fade로 지우고 앱 조작으로 복귀한다. 다른 모니터의 장면·revision·clearGeneration에는 영향을 주지 않는다. clearGeneration은 **모니터별**로 관리하며 전체 삭제는 각 모니터 값을 각각 증가시킨다. 전체 삭제는 계속 하나의 undo이고, 선택 삭제의 undo/redo는 해당 모니터만 변경한다. 빈 장면의 삭제도 진행 중 획을 무효화할 세대 이벤트를 보낸다.
