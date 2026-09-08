@@ -1,22 +1,22 @@
-# 2026-09-08 구현 인수 기록
+# 2026-09-09 구현 인수 기록
 
-상태: **v0.4.0 코드와 macOS 로컬 테스트 패키지 준비 완료. 양 OS 정식 지원 검증은 미완료.**
+상태: **v0.5.0 코드와 macOS 로컬 테스트 패키지 준비 완료. 양 OS 정식 지원 검증은 미완료.**
 
-후속 [전체 안정성 검증 (2026-09-08 시작)](stability-2026-09-08.md)에서 프런트엔드 45개·Rust 40개 및 macOS release 실행 파일 빌드를 확인했다. Canvas 복원 회귀를 수정했으나 설치 앱은 유지했으며, 단축키·검은 회색 화면 사건의 원인과 네이티브 실기 인수는 미완료다.
+후속 [전체 안정성 검증 (2026-09-08 시작)](stability-2026-09-08.md)에서 프런트엔드 45개·Rust 40개 및 macOS release 실행 파일 빌드를 확인했다. Canvas 복원 회귀 수정은 현재 v0.5.0에 포함했다. 단축키·검은 회색 화면 사건의 원인은 아직 확정하지 못했다. 후속 [사용성 개선 검증](usability-2026-09-09.md)에 이번 네이티브 검사 범위를 구분해 기록했다.
 
 ## 통과한 검사
 
 | 검사 | 결과 |
 | --- | --- |
 | `npm run check` | Svelte 오류0·경고0 |
-| `npm test` | 8개 파일, 43개 테스트 통과 |
+| `npm test` | 11개 파일, 52개 테스트 통과 |
 | `cargo fmt --check` | 통과 |
 | `cargo clippy --all-targets -- -D warnings` | 통과 |
-| `cargo test` | 37개 테스트 통과 |
-| `npm run tauri build -- --bundles app` | macOS arm64 v0.4.0 release 빌드 성공 |
+| `cargo test` | 44개 테스트 통과 |
+| `npm run tauri build -- --bundles app` | macOS arm64 v0.5.0 release 빌드 성공 |
 | `node scripts/generate-notices.mjs --check` | 잠금 파일·로컬 원문 일치, 303개 의존성 및 추가 폰트 고지 |
 | 독립 아키텍처 검토 | v0.1 당시 APPROVE, [검토 기록](architecture-review.md) |
-| 실제 macOS 핵심 흐름 | v0.1에서 준현님이 투명 필기·Esc 후 필기 유지 및 뒤 앱 조작 정상 확인. v0.2·v0.3 실기는 아래 별도 기록 |
+| 실제 macOS 핵심 흐름 | v0.1에서 준현님이 투명 필기·Esc 후 필기 유지 및 뒤 앱 조작 정상 확인. v0.2·v0.3 실기는 아래 별도 기록, v0.5 재진입·텍스트 이동/서식·삭제 복구는 사용성 개선 기록 참조 |
 | 번들 법적 고지 | OFL 포함 네 파일의 SHA-256이 소스 원본과 일치 |
 | 로컬 패키지 | macOS 포장 스크립트 구문·실행 및 ad-hoc 서명 검증 통과 |
 
@@ -24,8 +24,8 @@ Rust 최종 검사는 실제 번들 리소스를 사용했다. 초기 리소스 
 
 ## 전달물
 
-- `artifacts/My-Brush-0.4.0-macOS-arm64.zip`: 로컬 검증용 macOS 앱. ad-hoc 서명이며 Developer ID 공증본은 아니다.
-- `artifacts/My-Brush-0.4.0-source.zip`: 최종 기능·문서를 반영한 소스 사본(Git 이력 제외). Windows PC에서 압축을 풀고 README의 준비 절차와 `scripts/verify-windows.ps1`을 실행한다.
+- `artifacts/My-Brush-0.5.0-macOS-arm64.zip`: 로컬 검증용 macOS 앱. ad-hoc 서명이며 Developer ID 공증본은 아니다.
+- `artifacts/My-Brush-0.5.0-source.zip`: 최종 기능·문서를 반영한 소스 사본(Git 이력 제외). Windows PC에서 압축을 풀고 README의 준비 절차와 `scripts/verify-windows.ps1`을 실행한다.
 - `artifacts/SHA256SUMS.txt`: 전달 ZIP의 체크섬.
 - 바이너리와 임시 로그는 Git에 넣지 않는다. 리모트·push·공개 업로드는 수행하지 않았다.
 
