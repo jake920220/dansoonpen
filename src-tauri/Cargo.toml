@@ -1,6 +1,6 @@
 [package]
 name = "my-brush"
-version = "0.2.0"
+version = "0.3.0"
 description = "화면 위에 남기는 강의 필기"
 authors = ["김준현"]
 license = "Apache-2.0"
