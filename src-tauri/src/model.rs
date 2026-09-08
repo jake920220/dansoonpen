@@ -232,7 +232,25 @@ fn default_presets() -> Vec<BrushPreset> {
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CursorSettings {
+    pub color: String,
+    pub size: f64,
+    pub show_clicks: bool,
+}
+impl Default for CursorSettings {
+    fn default() -> Self {
+        Self {
+            color: "#ffcf56".into(),
+            size: 48.,
+            show_clicks: true,
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AppSettings {
+    #[serde(default)]
+    pub cursor: CursorSettings,
     #[serde(default = "default_presets")]
     pub presets: Vec<BrushPreset>,
     pub version: u32,
@@ -258,6 +276,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             version: 3,
+            cursor: CursorSettings::default(),
             presets: default_presets(),
             color: "#ffcf56".into(),
             width: 12.,
@@ -306,7 +325,9 @@ impl AppSettings {
         Ok(next)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 3
+        if !valid_color(&self.cursor.color)
+            || !finite_range(self.cursor.size, 24., 96.)
+            || self.version != 3
             || self.presets.len() != 3
             || self.presets.iter().any(|p| {
                 p.name.trim().is_empty()
@@ -333,6 +354,7 @@ impl AppSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub cursor: Option<CursorSettings>,
     pub presets: Option<Vec<BrushPreset>>,
     pub version: Option<u32>,
     pub color: Option<String>,
@@ -355,6 +377,7 @@ impl SettingsPatch {
     }
     pub fn apply(self, current: &AppSettings) -> AppSettings {
         AppSettings {
+            cursor: self.cursor.unwrap_or_else(|| current.cursor.clone()),
             presets: self.presets.unwrap_or_else(|| current.presets.clone()),
             version: self.version.unwrap_or(current.version),
             color: self.color.unwrap_or_else(|| current.color.clone()),
@@ -392,6 +415,7 @@ pub struct DisplayInfo {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
+    pub cursor_enabled: bool,
     pub annotations_visible: bool,
     pub mode: Mode,
     pub active_display_id: Option<String>,

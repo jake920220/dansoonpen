@@ -5,7 +5,7 @@ type Listener = (payload: unknown) => void;
 const listeners = new Map<string, Set<Listener>>();
 const displayId = 'preview-display';
 let state: AppState = {
-  annotationsVisible: true,
+  cursorEnabled: false, annotationsVisible: true,
   mode: new URLSearchParams(location.search).get('view') === 'overlay' ? 'draw' : 'interact',
   activeDisplayId: displayId, revision: 1, error: null,
   settings: structuredClone(DEFAULT_SETTINGS), brush: defaultBrush(DEFAULT_SETTINGS),
@@ -32,6 +32,8 @@ export const preview = {
     args = JSON.parse(JSON.stringify(args)); // Match the native JSON boundary, including Svelte proxies.
     let result: unknown;
     switch (command) {
+      case 'get_cursor': result = null; break;
+      case 'toggle_cursor': state.cursorEnabled = !state.cursorEnabled; result = updateState(); break;
       case 'get_state': result = structuredClone(state); break;
       case 'get_scene': result = structuredClone(scene); break;
       case 'set_mode': state.mode = args.mode as AppState['mode']; if (state.mode === 'draw') state.annotationsVisible = true; result = updateState(); break;

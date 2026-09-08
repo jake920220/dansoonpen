@@ -43,3 +43,32 @@ pub fn display_identity(monitor: &tauri::Monitor) -> String {
         monitor.name().map(String::as_str).unwrap_or("screen")
     )
 }
+
+pub fn cursor_reading(
+    window: &WebviewWindow,
+    display_id: String,
+) -> Result<crate::cursor::Reading, String> {
+    use windows_sys::Win32::{
+        Foundation::POINT,
+        UI::{
+            Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON},
+            WindowsAndMessaging::GetCursorPos,
+        },
+    };
+    let mut point = POINT { x: 0, y: 0 };
+    if unsafe { GetCursorPos(&mut point) } == 0 {
+        return Err("커서 위치를 읽지 못했습니다.".into());
+    }
+    let origin = window.inner_position().map_err(|e| e.to_string())?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let clicks = u32::from(unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } < 0);
+    Ok(crate::cursor::Reading::local(
+        display_id,
+        (point.x as f64 - origin.x as f64) / scale,
+        (point.y as f64 - origin.y as f64) / scale,
+        size.width as f64 / scale,
+        size.height as f64 / scale,
+        clicks,
+    ))
+}

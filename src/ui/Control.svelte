@@ -137,6 +137,13 @@
             </div>
           {/each}
         </section>
+        <section class="settings-section"><h2><Icon name="cursor-halo" size={18} />커서 강조</h2>
+          <label class="checkbox-row"><span><strong>선택한 화면에서 커서 강조</strong><small>앱 조작 중에도 표시합니다. 앱을 다시 실행하면 꺼집니다.</small></span><input type="checkbox" checked={appState?.cursorEnabled ?? false} onchange={() => action(bridge.toggleCursor)} /></label>
+          <div class="cursor-settings-preview"><span class="cursor-sample" style:--cursor-color={draft.cursor.color} style:width={`${draft.cursor.size}px`} style:height={`${draft.cursor.size}px`}><Icon name="pointer" size={18} /></span><div class="cursor-colors">{#each draft.quickColors as color}<button type="button" aria-label={`커서 색상 ${color}`} aria-pressed={draft.cursor.color === color} style:background={color} onclick={() => appearance({ cursor: { ...draft.cursor, color } })}></button>{/each}</div></div>
+          <div class="setting-row"><label for="cursor-size">강조 원 크기</label><div class="range-value"><input id="cursor-size" type="range" min="24" max="96" step="2" value={draft.cursor.size} oninput={(e) => appearance({ cursor: { ...draft.cursor, size: Number(e.currentTarget.value) } })} /><output>{draft.cursor.size}px</output></div></div>
+          <label class="checkbox-row"><span><strong>클릭 위치 표시</strong><small>왼쪽 클릭에 짧은 원을 표시합니다.</small></span><input type="checkbox" checked={draft.cursor.showClicks} onchange={(e) => appearance({ cursor: { ...draft.cursor, showClicks: e.currentTarget.checked } })} /></label>
+          <p class="field-hint">그리기 중 C 또는 메뉴에서 켜고 끕니다. 꺼져 있을 때 위치 확인도 멈춥니다.</p>
+        </section>
         <section class="settings-section"><h2><Icon name="keyboard" size={18} />단축키</h2>
           <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>
           <div class="setting-row"><label for="clear-shortcut">전체 지우기</label><ShortcutRecorder id="clear-shortcut" value={draft.clearShortcut} onchange={(value) => { draft.clearShortcut = value; change(); }} {capture} /></div>

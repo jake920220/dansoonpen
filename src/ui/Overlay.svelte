@@ -7,6 +7,7 @@
   import { DEFAULT_SETTINGS, TOOL_LABELS, defaultBrush, type ArrowAnnotation, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
   import Icon from './Icon.svelte';
   import ToolbarFrame from './ToolbarFrame.svelte';
+  import CursorHighlight from './CursorHighlight.svelte';
   import ColorPalette from './ColorPalette.svelte';
   import { SettingsWriter } from '../app/settings-writer';
   import { canvasKey, isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
@@ -267,7 +268,8 @@
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
     const key = canvasKey(event);
     const tools: Record<string, Tool> = { p: 'pen', e: 'eraser', t: 'text', a: 'arrow', h: 'highlighter' };
-    if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
+    if (key === 'c') { event.preventDefault(); void action(bridge.toggleCursor); }
+    else if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
     else if (key === '[' || key === ']') { event.preventDefault(); setWidth(Math.max(tool === 'highlighter' ? 8 : 1, Math.min(tool === 'highlighter' ? 64 : 32, activeWidth + (key === ']' ? 1 : -1)))); }
   }
@@ -282,6 +284,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
 <div bind:this={eraserCursor} class="eraser-cursor" style:width={`${Math.max(10, localWidth * 2) * 2}px`} style:height={`${Math.max(10, localWidth * 2) * 2}px`}></div>
+
+{#if appState?.cursorEnabled && appState.activeDisplayId === displayId}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
 
 {#if drawing}
   <div class="draw-frame" aria-hidden="true"></div>
@@ -308,6 +312,7 @@
       </div>
       <span class="toolbar-divider"></span>
       {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
+      <button aria-label="커서 강조" aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title="커서 강조 켜기/끄기 (C)" onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>
       <button aria-label="필기 잠시 숨기기" title={`필기 잠시 숨기기 (${shortcutLabel(settings.visibilityShortcut)})`} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>
       <button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>

@@ -1,3 +1,4 @@
+mod cursor;
 mod model;
 mod platform;
 mod settings;
@@ -16,6 +17,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 struct RuntimeState {
     app: AppState,
     scenes: SceneStore,
+    cursor: cursor::Stream,
     previous_focus: platform::PreviousFocus,
     settings_path: PathBuf,
     registered: Vec<Shortcut>,
@@ -27,6 +29,7 @@ struct TrayShortcuts {
     draw: MenuItem<tauri::Wry>,
     clear: MenuItem<tauri::Wry>,
     visibility: MenuItem<tauri::Wry>,
+    cursor: MenuItem<tauri::Wry>,
 }
 impl TrayShortcuts {
     fn update(&self, settings: &AppSettings) -> tauri::Result<()> {
@@ -98,6 +101,13 @@ fn emit_state(app: &tauri::AppHandle, data: &mut RuntimeState) {
             "필기 잠시 숨기기"
         } else {
             "숨긴 필기 다시 표시"
+        });
+    }
+    if let Some(tray) = app.try_state::<TrayShortcuts>() {
+        let _ = tray.cursor.set_text(if data.app.cursor_enabled {
+            "커서 강조 끄기"
+        } else {
+            "커서 강조 켜기"
         });
     }
     data.app.revision += 1;
@@ -235,6 +245,48 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
             Err(e)
         }
     }
+}
+fn toggle_cursor_highlight(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    if !data.app.cursor_enabled {
+        let id = data
+            .app
+            .active_display_id
+            .clone()
+            .ok_or("연결된 화면이 없습니다.")?;
+        ensure_overlay(app, data, &id)?
+            .show()
+            .map_err(|e| e.to_string())?;
+    }
+    data.app.cursor_enabled = !data.app.cursor_enabled;
+    data.cursor.latest = None;
+    app.state::<cursor::Monitor>()
+        .set_enabled(data.app.cursor_enabled);
+    emit_state(app, data);
+    Ok(())
+}
+#[tauri::command]
+async fn toggle_cursor(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let state = lock(&app);
+        let mut data = state.0.lock().map_err(|e| e.to_string())?;
+        toggle_cursor_highlight(&app, &mut data)
+    })
+    .await
+}
+#[tauri::command]
+async fn get_cursor(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<Option<cursor::Frame>, String> {
+    native_command(app.clone(), move || {
+        authorized(&window)?;
+        let state = lock(&app);
+        let mut data = state.0.lock().map_err(|e| e.to_string())?;
+        cursor::poll(&app, &mut data)?;
+        Ok(data.cursor.latest.clone())
+    })
+    .await
 }
 fn toggle_visibility(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
     data.app.annotations_visible = !data.app.annotations_visible;
@@ -390,6 +442,13 @@ fn refresh_displays(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(
             .or_else(|| data.app.displays.iter().find(|d| d.connected))
             .map(|d| d.id.clone());
     }
+    if data.app.cursor_enabled {
+        if let Some(id) = &data.app.active_display_id {
+            ensure_overlay(app, data, id)?
+                .show()
+                .map_err(|e| e.to_string())?;
+        }
+    }
     for d in &data.app.displays {
         if let Some(w) = app.get_webview_window(&label(&d.id)) {
             if d.connected {
@@ -443,6 +502,11 @@ async fn select_display(
             return Err("연결되지 않은 화면입니다.".into());
         }
         let mode = d.app.mode;
+        if d.app.cursor_enabled {
+            ensure_overlay(&app, &d, &display_id)?
+                .show()
+                .map_err(|e| e.to_string())?;
+        }
         d.app.active_display_id = Some(display_id);
         change_mode(&app, &mut d, mode)?;
         Ok(d.app.clone())
@@ -718,6 +782,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         true,
         Some(&settings.clear_shortcut),
     )?;
+    let cursor = MenuItem::with_id(app, "cursor", "커서 강조 켜기", true, None::<&str>)?;
     let clear_current_item = MenuItem::with_id(
         app,
         "clear-current",
@@ -742,6 +807,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
             &draw,
             &interact,
             &visibility,
+            &cursor,
             &clear_current_item,
             &clear,
             &quit,
@@ -776,6 +842,11 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                         "interact" => {
                             let _ = change_mode(app, &mut d, Mode::Interact);
                         }
+                        "cursor" => {
+                            if let Err(e) = toggle_cursor_highlight(app, &mut d) {
+                                report(app, &mut d, e);
+                            }
+                        }
                         "visibility" => {
                             let _ = toggle_visibility(app, &mut d);
                         }
@@ -797,6 +868,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         draw,
         clear,
         visibility,
+        cursor,
     });
     Ok(())
 }
@@ -878,6 +950,8 @@ pub fn run() {
             clear_all,
             clear_current,
             toggle_annotations,
+            toggle_cursor,
+            get_cursor,
             undo,
             redo,
             show_control,
@@ -893,6 +967,7 @@ pub fn run() {
             };
             app.manage(Session(Mutex::new(RuntimeState {
                 app: AppState {
+                    cursor_enabled: false,
                     annotations_visible: true,
                     mode: Mode::Interact,
                     active_display_id: None,
@@ -903,6 +978,7 @@ pub fn run() {
                     error,
                 },
                 scenes: SceneStore::default(),
+                cursor: cursor::Stream::default(),
                 previous_focus: Default::default(),
                 settings_path: path,
                 registered: vec![],
@@ -947,6 +1023,7 @@ pub fn run() {
                 }
                 app.set_menu(menu)?;
             }
+            app.manage(cursor::Monitor::start(app.handle().clone()));
             tray(app.handle(), &loaded)?;
             {
                 let state = app.state::<Session>();

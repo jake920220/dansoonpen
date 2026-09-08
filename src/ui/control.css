@@ -99,4 +99,10 @@
 .preset-setting .secondary { font-size: 10px; padding: 8px; }
 
 .session-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 24px; }
-.session-actions > span { color: var(--muted); font-size: 12px; }
+.session-actions > span { color: #97a2b5; font-size: 12px; }
+
+.cursor-settings-preview { min-height: 112px; display: flex; align-items: center; gap: 32px; }
+.cursor-sample { display: grid; place-items: center; border: 2px solid var(--cursor-color); background: color-mix(in srgb, var(--cursor-color) 22%, transparent); border-radius: 50%; flex: 0 0 auto; color: white; }
+.cursor-colors { display: flex; gap: 12px; flex-wrap: wrap; }
+.cursor-colors button { width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent; }
+.cursor-colors button[aria-pressed="true"] { outline: 2px solid #e7ebf3; outline-offset: 3px; }

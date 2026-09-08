@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { AppSettings, AppState, BrushSettings, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
+import type { AppSettings, AppState, CursorFrame, BrushSettings, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
 
 export const native = isTauri();
 const preview = !native && import.meta.env.DEV ? import('../dev/preview').then((m) => m.preview) : null;
@@ -18,6 +18,9 @@ async function subscribe<T>(event: string, handler: (payload: T) => void): Promi
 }
 
 export const bridge = {
+  toggleCursor: () => call<void>('toggle_cursor'),
+  getCursor: () => call<CursorFrame | null>('get_cursor'),
+  onCursor: (handler: (frame: CursorFrame) => void) => subscribe('brush-cursor', handler),
   getState: () => call<AppState>('get_state'),
   setMode: (mode: Mode) => call<AppState>('set_mode', { mode }),
   selectDisplay: (displayId: string) => call<AppState>('select_display', { displayId }),

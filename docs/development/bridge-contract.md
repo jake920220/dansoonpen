@@ -39,3 +39,13 @@ V0.2 adds arrows and highlighter strokes. `stroke.opacity` defaults to 1 for old
 ## 선택한 화면 삭제
 
 `clear_current`는 현재 선택한 모니터만 수동 fade로 지우고 앱 조작으로 복귀한다. 다른 모니터의 장면·revision·clearGeneration에는 영향을 주지 않는다. clearGeneration은 **모니터별**로 관리하며 전체 삭제는 각 모니터 값을 각각 증가시킨다. 전체 삭제는 계속 하나의 undo이고, 선택 삭제의 undo/redo는 해당 모니터만 변경한다. 빈 장면의 삭제도 진행 중 획을 무효화할 세대 이벤트를 보낸다.
+
+## 커서 강조
+
+`AppState.cursorEnabled`은 기본 꺼짐인 세션 상태이며 `toggle_cursor`로 변경한다. `settings.cursor`의 color/size(24–96)/showClicks만 저장한다. 선택한 화면의 기존 오버레이를 재사용하며 앱 조작·필기 숨김 중에도 커서는 표시할 수 있다. 입력 포커스나 주석·undo에는 영향이 없다.
+
+`brush-cursor`는 선택한 창에만 전달하는 창 내부 논리 좌표, visible, clicks, sequence다. 비활성 시 worker는 조건변수에서 대기한다. 활성 시 최대 약30Hz로 위치를 읽고 값이 바뀔 때만 전송하며 네이티브 콜백을 중첩 적재하지 않는다. CanvasRenderer 대신 작은 DOM 레이어만 움직이고 클릭 애니메이션은 최대 하나다. 화면을 벗어나면 좌표는0/숨김으로 정규화한다.
+
+macOS는 NSWindow의 `mouseLocationOutsideOfEventStream`과 `CGEventSourceCounterForEventType`(현재 세션의 왼쪽 클릭 횟수)을 사용한다. 이벤트 주입·이벤트 탭·화면 캡처·키 입력 수집은 없다. AppKit의 창 좌표를 사용해 서로 다른 배율의 바탕화면 원점 환산을 피한다. Windows는 GetCursorPos와 GetAsyncKeyState의 현재 왼쪽 버튼 상태를 읽는다. Windows의 빠른 클릭 누락·좌표·입력은 실제 PC 검증을 기다린다.
+
+참고: [Apple 창 내부 마우스 위치](https://developer.apple.com/documentation/appkit/nswindow/mouselocationoutsideofeventstream), [Apple Quartz 이벤트 함수](https://developer.apple.com/documentation/coregraphics/core-graphics-functions), [Microsoft GetCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getcursorpos).

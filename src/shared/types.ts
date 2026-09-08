@@ -11,7 +11,10 @@ export interface ArrowAnnotation { kind: 'arrow'; id: string; start: Point; end:
 export type Annotation = StrokeAnnotation | TextAnnotation | ArrowAnnotation;
 export interface BrushSettings { tool: Tool; color: string; width: number; textSize: number; highlighterWidth: number; highlighterOpacity: number }
 export interface BrushPreset { name: string; brush: BrushSettings }
+export interface CursorSettings { color: string; size: number; showClicks: boolean }
+export interface CursorFrame { displayId: string; x: number; y: number; visible: boolean; clicks: number; sequence: number }
 export interface AppSettings {
+  cursor: CursorSettings;
   presets: BrushPreset[];
   version: number; color: string; width: number; textSize: number;
   quickColors: string[]; toggleShortcut: string; clearShortcut: string; visibilityShortcut: string; reduceMotion: boolean;
@@ -21,13 +24,14 @@ export interface DisplayInfo {
   scaleFactor: number; isPrimary: boolean; connected: boolean;
 }
 export interface AppState {
-  annotationsVisible: boolean; mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
+  cursorEnabled: boolean; annotationsVisible: boolean; mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
   settings: AppSettings; brush: BrushSettings; revision: number; error: string | null;
 }
 export interface SceneSnapshot { displayId: string; revision: number; clearGeneration: number; annotations: Annotation[] }
 export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fadeDurationMs: number }
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
+  cursor: { color: '#ffcf56', size: 48, showClicks: true },
   version: 3, color: '#ffcf56', width: 12, textSize: 28,
   presets: [
     { name: '기본 강조', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 28 } },

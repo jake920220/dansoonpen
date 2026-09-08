@@ -98,3 +98,27 @@ pub fn display_identity(monitor: &tauri::Monitor) -> String {
         monitor.position().y
     )
 }
+
+pub fn cursor_reading(
+    window: &WebviewWindow,
+    display_id: String,
+) -> Result<crate::cursor::Reading, String> {
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    // Main thread only. AppKit returns window-local points, avoiding mixed-DPI desktop conversion.
+    let ns = unsafe { &*raw.cast::<NSWindow>() };
+    let point = ns.mouseLocationOutsideOfEventStream();
+    let size = ns.frame().size;
+    let clicks = unsafe { CGEventSourceCounterForEventType(0, 1) }; // Combined session, left mouse down.
+    Ok(crate::cursor::Reading::local(
+        display_id,
+        point.x,
+        size.height - point.y,
+        size.width,
+        size.height,
+        clicks,
+    ))
+}
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceCounterForEventType(state: i32, event: u32) -> u32;
+}
