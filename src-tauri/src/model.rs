@@ -741,6 +741,61 @@ mod tests {
         assert!(s.snapshot("a").unwrap().annotations.is_empty());
     }
     #[test]
+    fn repeated_scoped_clears_reject_old_text_but_keep_other_display_edits() {
+        let mut store = SceneStore::default();
+        store.ensure("a");
+        store.ensure("b");
+        for round in 0..100 {
+            store.clear(350);
+            let generation_a = store.snapshot("a").unwrap().clear_generation;
+            let generation_b = store.snapshot("b").unwrap().clear_generation;
+            store
+                .apply(
+                    SceneEdit {
+                        display_id: "a".into(),
+                        clear_generation: generation_a,
+                        added: vec![text_note("text", "원문")],
+                        removed_ids: vec![],
+                    },
+                    350,
+                )
+                .unwrap();
+            store.clear_display("a", 350).unwrap();
+            assert!(store
+                .apply(
+                    SceneEdit {
+                        display_id: "a".into(),
+                        clear_generation: generation_a,
+                        added: vec![text_note("text", "늦은 IME 확정")],
+                        removed_ids: vec!["text".into()],
+                    },
+                    350
+                )
+                .unwrap()
+                .is_empty());
+            store
+                .apply(
+                    SceneEdit {
+                        display_id: "b".into(),
+                        clear_generation: generation_b,
+                        added: vec![text_note("other", &format!("다른 화면 {round}"))],
+                        removed_ids: vec![],
+                    },
+                    350,
+                )
+                .unwrap();
+            add(&mut store, "a", "fresh");
+            assert_eq!(store.snapshot("a").unwrap().annotations[0].id(), "fresh");
+            assert_eq!(store.snapshot("b").unwrap().annotations.len(), 1);
+            store.undo(); // Only the new A stroke is undone.
+            assert!(store.snapshot("a").unwrap().annotations.is_empty());
+            assert_eq!(store.snapshot("b").unwrap().annotations.len(), 1);
+            store.redo(350);
+            assert_eq!(store.snapshot("a").unwrap().annotations[0].id(), "fresh");
+            assert!(store.undo.len() <= MAX_HISTORY);
+        }
+    }
+    #[test]
     fn text_replacement_rejects_implicit_or_duplicate_ids_and_wrong_types_atomically() {
         let mut s = SceneStore::default();
         s.ensure("a");

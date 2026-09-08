@@ -107,4 +107,47 @@ mod tests {
         assert_eq!(current, vec![a]);
         assert_eq!(backend.registered, HashSet::from([a.id()]));
     }
+    #[test]
+    fn partial_rollback_failure_can_be_repaired_from_the_tracked_registry() {
+        let a = key("Alt+A");
+        let b = key("Alt+B");
+        let c = key("Alt+C");
+        let mut backend = Fake::default();
+        backend.register(a).unwrap();
+        backend.register(b).unwrap();
+        let mut current = vec![a, b];
+        backend.fail_remove = Some(b.id());
+        backend.blocked.insert(a.id());
+        // Add C, remove A, fail removing B, then fail restoring A.
+        assert!(replace(&mut backend, &mut current, vec![c]).is_err());
+        assert_eq!(backend.registered, HashSet::from([b.id(), c.id()]));
+        assert_eq!(
+            current.iter().map(Shortcut::id).collect::<HashSet<_>>(),
+            backend.registered
+        );
+        backend.blocked.clear();
+        replace(&mut backend, &mut current, vec![a, b]).unwrap();
+        assert_eq!(backend.registered, HashSet::from([a.id(), b.id()]));
+        assert_eq!(
+            current.iter().map(Shortcut::id).collect::<HashSet<_>>(),
+            backend.registered
+        );
+    }
+
+    #[test]
+    fn capture_restore_failure_leaves_no_partial_keys_and_allows_a_retry() {
+        let a = key("Alt+A");
+        let b = key("Alt+B");
+        let mut backend = Fake::default();
+        let mut current = vec![];
+        replace(&mut backend, &mut current, vec![a, b]).unwrap();
+        replace(&mut backend, &mut current, vec![]).unwrap();
+        backend.blocked.insert(b.id());
+        assert!(replace(&mut backend, &mut current, vec![a, b]).is_err());
+        assert!(current.is_empty());
+        assert!(backend.registered.is_empty());
+        backend.blocked.clear();
+        replace(&mut backend, &mut current, vec![a, b]).unwrap();
+        assert_eq!(backend.registered, HashSet::from([a.id(), b.id()]));
+    }
 }
