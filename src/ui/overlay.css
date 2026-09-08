@@ -59,3 +59,5 @@
 .brush-reset button, .preset-save button, .preset-save select { background: #343c49; border: 1px solid #525e70; border-radius: 6px; padding: 7px; color: #d6deeb; font-size: 10px; }
 .brush-reset button { margin-left: auto; }
 .preset-save select { flex: 1; min-width: 0; }
+
+.current-size { font-size: 10px; min-width: 31px; font-variant-numeric: tabular-nums; color: #dce0e8; }

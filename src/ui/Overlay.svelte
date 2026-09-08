@@ -9,6 +9,8 @@
   import ToolbarFrame from './ToolbarFrame.svelte';
   import CursorHighlight from './CursorHighlight.svelte';
   import ColorPalette from './ColorPalette.svelte';
+  import SizeControl from './SizeControl.svelte';
+  import { toolSize, sizePatch, stepSize } from '../shared/tool-size';
   import { SettingsWriter } from '../app/settings-writer';
   import { canvasKey, isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
   import { observeCanvasDiagnostics, opaqueBackground, registerDiagnosticMetrics, reportDiagnostic } from '../app/diagnostics';
@@ -304,7 +306,7 @@
     try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
     catch (e) { error = message(e); }
   }
-  function setWidth(width: number) { updateBrush(tool === 'highlighter' ? { highlighterWidth: width } : tool === 'eraser' ? { eraserSize: width } : { width }); }
+  function setSize(value: number) { updateBrush(sizePatch(tool, value)); }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
     if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
@@ -331,7 +333,7 @@
     if (key === 'c') { event.preventDefault(); void action(bridge.toggleCursor); }
     else if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
-    else if (key === '[' || key === ']') { event.preventDefault(); setWidth(Math.max(tool === 'highlighter' ? 8 : tool === 'eraser' ? 16 : 1, Math.min(tool === 'highlighter' ? 64 : tool === 'eraser' ? 128 : 32, activeWidth + (key === ']' ? 1 : -1)))); }
+    else if (key === '[' || key === ']') { event.preventDefault(); updateBrush(stepSize(brush, key === ']' ? 1 : -1)); }
   }
   function textKey(event: KeyboardEvent) {
     if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
@@ -359,7 +361,7 @@
         <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
-      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="width-dot" style:width={`${Math.min(14, activeWidth + 2)}px`} style:height={`${Math.min(14, activeWidth + 2)}px`}></span></button>
+      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={brush.color}></span><span class="current-size">{toolSize(brush)}px</span></button>
       <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
         {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
       </div>
@@ -378,9 +380,9 @@
       <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
     {#snippet panel()}
       <div class="palette-panel">
-        <div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{brush.color.toUpperCase()}</code></div>
-        <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />
-        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : tool === 'eraser' ? '지우개 크기' : `${TOOL_LABELS[tool]} 굵기`}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" value={localTextSize} oninput={(e) => updateBrush({ textSize: Number(e.currentTarget.value) })} /><output>{localTextSize}px</output>{:else}<input aria-label="도구 굵기" type="range" min={tool === 'highlighter' ? 8 : tool === 'eraser' ? 16 : 1} max={tool === 'highlighter' ? 64 : tool === 'eraser' ? 128 : 32} step="1" value={activeWidth} oninput={(e) => setWidth(Number(e.currentTarget.value))} /><output>{activeWidth}px</output>{/if}</label>
+        {#if tool !== 'eraser'}<div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{brush.color.toUpperCase()}</code></div>
+        <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />{/if}
+        <SizeControl {tool} value={toolSize(brush)} color={brush.color} opacity={brush.highlighterOpacity} onchange={setSize} />
         {#if tool === 'highlighter'}<label class="palette-range"><span>불투명도</span><input aria-label="형광펜 불투명도" type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
         <div class="brush-reset"><span>현재 도구에만 적용됩니다.</span><button onclick={resetBrush}>기본 펜으로</button></div>
         <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>
