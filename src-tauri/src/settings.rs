@@ -44,6 +44,25 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
     if settings.version == 2 {
         settings.version = 3;
     }
+    if settings.version == 3 {
+        let defaults = AppSettings::default();
+        if settings.text_size == 28. {
+            settings.text_size = defaults.text_size;
+        }
+        for ((preset, new), old_size) in settings
+            .presets
+            .iter_mut()
+            .zip(defaults.presets)
+            .zip([28., 28., 32.])
+        {
+            let mut old = new.clone();
+            old.brush.text_size = old_size;
+            if *preset == old {
+                *preset = new;
+            }
+        }
+        settings.version = 4;
+    }
     settings.validate()?;
     Ok(settings)
 }
@@ -90,6 +109,36 @@ pub fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    fn lecture_text_size_migrates_once_and_preserves_custom_preferences() {
+        let path =
+            std::env::temp_dir().join(format!("my-brush-text-size-{}.json", std::process::id()));
+        let mut old = AppSettings {
+            version: 3,
+            text_size: 28.,
+            width: 14.,
+            ..AppSettings::default()
+        };
+        for (preset, size) in old.presets.iter_mut().zip([28., 28., 32.]) {
+            preset.brush.text_size = size;
+        }
+        old.presets[1].name = "내 프리셋".into();
+        std::fs::write(&path, serde_json::to_vec(&old).unwrap()).unwrap();
+        let migrated = load(&path).unwrap();
+        assert_eq!(migrated.text_size, 40.);
+        assert_eq!(migrated.width, 14.);
+        assert_eq!(migrated.presets[0].brush.text_size, 40.);
+        assert_eq!(migrated.presets[1], old.presets[1]);
+        assert_eq!(migrated.presets[2].brush.text_size, 44.);
+        old.text_size = 54.;
+        std::fs::write(&path, serde_json::to_vec(&old).unwrap()).unwrap();
+        assert_eq!(load(&path).unwrap().text_size, 54.);
+        let mut current = migrated;
+        current.text_size = 28.;
+        save(&path, &current).unwrap();
+        assert_eq!(load(&path).unwrap().text_size, 28.);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn visibility_migration_preserves_an_existing_key_assignment() {
         let path =
             std::env::temp_dir().join(format!("my-brush-visibility-{}.json", std::process::id()));
@@ -123,7 +172,7 @@ mod tests {
         settings.toggle_shortcut = "Command+Shift+D".into();
         std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 3);
+        assert_eq!(loaded.version, 4);
         assert_eq!(loaded.width, 19.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.toggle_shortcut, settings.toggle_shortcut);
@@ -162,7 +211,7 @@ mod tests {
         json.as_object_mut().unwrap().remove("presets");
         std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 3);
+        assert_eq!(loaded.version, 4);
         assert_eq!(loaded.width, 17.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.presets.len(), 3);

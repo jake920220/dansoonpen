@@ -35,6 +35,7 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     ctx = {
       setTransform: vi.fn(), clearRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(),
       quadraticCurveTo: vi.fn(), arc: vi.fn(), fill: vi.fn(), fillText: vi.fn(),
+      measureText: vi.fn(() => ({ fontBoundingBoxAscent: 15, fontBoundingBoxDescent: 5 })),
       stroke: vi.fn(() => draws.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha })),
     };
     canvas = { width: 0, height: 0, style: {}, getContext: () => ctx } as unknown as HTMLCanvasElement;
@@ -157,8 +158,8 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     frame(0);
     expect(ctx.arc).toHaveBeenCalledWith(10, 20, 2, 0, Math.PI * 2);
     expect(ctx.fill).toHaveBeenCalledOnce();
-    expect(ctx.fillText.mock.calls).toEqual([['한글', 5, 10], ['English', 5, 36]]);
-    expect(ctx.textBaseline).toBe('top');
+    expect(ctx.fillText.mock.calls).toEqual([['한글', 5, 28], ['English', 5, 54]]);
+    expect(ctx.textBaseline).toBe('alphabetic');
   });
 
   it('composites each highlighter path once, multiplies fade alpha, and leaves new ink unchanged', () => {

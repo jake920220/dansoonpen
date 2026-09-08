@@ -117,6 +117,12 @@
     try { renderer = new CanvasRenderer(canvas); resize(); } catch (e) { error = message(e); reportDiagnostic('error'); }
     void (async () => {
       try {
+        // Load the bundled font before text layout or hit testing can begin.
+        await document.fonts.load('40px "Nanum Gothic"').catch(() => {
+          error = '나눔고딕을 불러오지 못해 기본 글꼴로 표시합니다.';
+          reportDiagnostic('error');
+        });
+        if (disposed) return;
         for (const promise of [bridge.onState(acceptState), bridge.onScene(acceptUpdate)]) {
           const off = await promise;
           if (disposed) off(); else unlisteners.push(off);

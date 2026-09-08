@@ -556,6 +556,17 @@ for (const pkg of sortedPackages) {
 for (const [digest, text] of sortedDocuments) {
   lines.push('='.repeat(78), `${textIds.get(digest)} | SHA-256 ${digest}`, '-'.repeat(78), text);
 }
+// Bundled, unmodified font assets have their own license independent of the app.
+const fontDirectory = path.join(root, 'src/assets/fonts/nanum-gothic');
+const fontSource = JSON.parse(read(path.join(fontDirectory, 'SOURCE.json')));
+lines.push('='.repeat(78), 'Bundled font: Nanum Gothic Regular', 'License: SIL Open Font License 1.1',
+  `Repository: ${fontSource.repository}`, `Upstream commit: ${fontSource.commit}`, 'Modifications: none');
+for (const [filename, evidence] of Object.entries(fontSource.files)) {
+  const actual = hash(fs.readFileSync(path.join(fontDirectory, filename)));
+  if (actual !== evidence.sha256) throw new Error(`Bundled font evidence differs: ${filename}`);
+  lines.push(`File: ${filename}`, `Source: ${evidence.source}`, `SHA-256: ${actual}`);
+}
+lines.push('', read(path.join(fontDirectory, 'OFL.txt')));
 const output = lines.join('\n').trimEnd() + '\n';
 if (process.argv.includes('--check')) {
   if (!fs.existsSync(destination) || read(destination) !== output) {

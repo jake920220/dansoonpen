@@ -35,7 +35,7 @@
 .hint-separator { width: 1px; height: 11px; background: #535c6d; }
 .hint-count { color: #8998ad; padding-left: 4px; font-size: 9px; }
 .text-editor { position: fixed; z-index: 12; max-width: calc(100vw - 20px); }
-.text-editor textarea { display: block; width: min(440px, calc(100vw - 30px)); min-height: 55px; max-height: 60vh; resize: both; border: 1px dashed #ffcf56; border-radius: 4px 4px 0 0; padding: 0; margin: 0; background: #20252b99; outline: none; overflow: auto; }
+.text-editor textarea { display: block; width: min(440px, calc(100vw - 30px)); min-height: 55px; max-height: 60vh; resize: both; border: 0; box-shadow: 0 0 0 1px #ffcf56; border-radius: 4px 4px 0 0; padding: 0; margin: 0; background: #20252b99; outline: none; overflow: auto; }
 .text-editor textarea::placeholder { color: #ffffff90; }
 .text-editor-actions { display: flex; gap: 8px; align-items: center; padding: 6px 7px; background: #232831; color: #a8b5c9; border: 1px solid #535d6c; border-top: 0; border-radius: 0 0 7px 7px; }
 .text-editor-actions > span { margin-right: auto; font-size: 9px; }

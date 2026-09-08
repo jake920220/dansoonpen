@@ -212,9 +212,9 @@ pub struct BrushPreset {
 }
 fn default_presets() -> Vec<BrushPreset> {
     [
-        ("기본 강조", Tool::Pen, "#ffcf56", 12., 28.),
-        ("빨간 밑줄", Tool::Pen, "#ff6b6b", 4., 28.),
-        ("민트 메모", Tool::Text, "#57d9c6", 6., 32.),
+        ("기본 강조", Tool::Pen, "#ffcf56", 12., 40.),
+        ("빨간 밑줄", Tool::Pen, "#ff6b6b", 4., 40.),
+        ("민트 메모", Tool::Text, "#57d9c6", 6., 44.),
     ]
     .into_iter()
     .map(|(name, tool, color, width, text_size)| BrushPreset {
@@ -275,12 +275,12 @@ fn visibility_shortcut() -> String {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            version: 3,
+            version: 4,
             cursor: CursorSettings::default(),
             presets: default_presets(),
             color: "#ffcf56".into(),
             width: 12.,
-            text_size: 28.,
+            text_size: 40.,
             quick_colors: [
                 "#ffcf56", "#ff6b6b", "#57d9c6", "#78a9ff", "#c4a0ff", "#ffffff",
             ]
@@ -327,7 +327,7 @@ impl AppSettings {
     pub fn validate(&self) -> Result<(), String> {
         if !valid_color(&self.cursor.color)
             || !finite_range(self.cursor.size, 24., 96.)
-            || self.version != 3
+            || self.version != 4
             || self.presets.len() != 3
             || self.presets.iter().any(|p| {
                 p.name.trim().is_empty()

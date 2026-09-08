@@ -1,6 +1,14 @@
 @import url('./ui/control.css');
 @import url('./ui/overlay.css');
 
+@font-face {
+  font-family: 'Nanum Gothic';
+  src: url('./assets/fonts/nanum-gothic/NanumGothic-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif; color: #edf0f5; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; font-size: 14px; color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body, #app { margin: 0; width: 100%; height: 100%; background: transparent; }

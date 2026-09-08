@@ -31,7 +31,8 @@
     "resources": {
       "../LICENSE": "LICENSE",
       "../NOTICE": "NOTICE",
-      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
+      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
+      "../src/assets/fonts/nanum-gothic/OFL.txt": "licenses/NanumGothic-OFL.txt"
     },
     "macOS": {
       "minimumSystemVersion": "13.0"

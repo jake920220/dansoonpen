@@ -32,11 +32,11 @@ export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fade
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
   cursor: { color: '#ffcf56', size: 48, showClicks: true },
-  version: 3, color: '#ffcf56', width: 12, textSize: 28,
+  version: 4, color: '#ffcf56', width: 12, textSize: 40,
   presets: [
-    { name: '기본 강조', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 28 } },
-    { name: '빨간 밑줄', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 28 } },
-    { name: '민트 메모', brush: { tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 32 } },
+    { name: '기본 강조', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 40 } },
+    { name: '빨간 밑줄', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 40 } },
+    { name: '민트 메모', brush: { tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 44 } },
   ],
   visibilityShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+V' : 'Alt+Shift+V',
   quickColors: ['#ffcf56', '#ff6b6b', '#57d9c6', '#78a9ff', '#c4a0ff', '#ffffff'],

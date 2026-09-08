@@ -144,10 +144,15 @@ export class CanvasRenderer {
     if (annotation.kind === 'text') {
       if (!isFinitePoint(annotation) || !Number.isFinite(annotation.fontSize) || annotation.fontSize <= 0) return;
       ctx.font = `${annotation.fontSize}px ${FONT_FAMILY}`;
-      ctx.textBaseline = 'top';
+      // Match the textarea's CSS line box so committing/reopening text does not jump.
+      ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
+      const metrics = ctx.measureText('한글Mg');
+      const ascent = metrics.fontBoundingBoxAscent ?? annotation.fontSize * 0.8;
+      const descent = metrics.fontBoundingBoxDescent ?? annotation.fontSize * 0.2;
+      const baseline = (annotation.fontSize * TEXT_LINE_HEIGHT - ascent - descent) / 2 + ascent;
       annotation.text.split('\n').forEach((line, index) => {
-        ctx.fillText(line, annotation.x, annotation.y + index * annotation.fontSize * TEXT_LINE_HEIGHT);
+        ctx.fillText(line, annotation.x, annotation.y + baseline + index * annotation.fontSize * TEXT_LINE_HEIGHT);
       });
       return;
     }

@@ -1,7 +1,7 @@
 import { arrowSegments } from './arrow';
 import type { Annotation, Point, TextAnnotation } from '../shared/types';
 
-export const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif';
+export const FONT_FAMILY = '"Nanum Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 export const TEXT_LINE_HEIGHT = 1.3;
 export type MeasureText = (text: string, fontSize: number) => number;
 
