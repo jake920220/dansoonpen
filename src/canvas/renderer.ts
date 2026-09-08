@@ -67,16 +67,17 @@ export class CanvasRenderer {
     if (this.disposed || annotations.length === 0) return;
     const now = performance.now();
     const incoming = new Set(annotations.map(({ id }) => id));
-    this.fades = this.fades.filter(({ annotation, startedAt, duration }) => !incoming.has(annotation.id) && now < startedAt + duration);
     const duration = Number.isFinite(durationMs) ? Math.min(MAX_FADE_DURATION_MS, Math.max(0, durationMs)) : 0;
+    this.fades = this.fades.filter((fade) => now < fade.startedAt + fade.duration && (duration > 0 || !incoming.has(fade.annotation.id)));
     if (duration > 0) {
       const live = new Set(this.scene.map(({ id }) => id));
+      const fading = new Set(this.fades.map(({ annotation }) => annotation.id));
       // Keep newest fades first in the budget. Snapshot coordinates against future mutation.
       let pointCount = 0;
       const next: FadingAnnotation[] = [];
       for (let i = annotations.length - 1; i >= 0 && next.length < MAX_FADE_OBJECTS; i--) {
         const annotation = annotations[i];
-        if (live.has(annotation.id)) continue;
+        if (live.has(annotation.id) || fading.has(annotation.id)) continue;
         const cost = annotationCost(annotation);
         if (pointCount + cost > MAX_FADE_POINTS) continue;
         pointCount += cost;
@@ -123,7 +124,10 @@ export class CanvasRenderer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.fades = this.fades.filter(({ startedAt, duration }) => now < startedAt + duration);
-    for (const fade of this.fades) this.draw(fade.annotation, Math.max(0, 1 - (now - fade.startedAt) / fade.duration));
+    for (const fade of this.fades) {
+      const t = Math.max(0, Math.min(1, (now - fade.startedAt) / fade.duration));
+      this.draw(fade.annotation, 1 - t * t * (3 - 2 * t));
+    }
     for (const annotation of this.scene) this.draw(annotation, 1);
     if (this.preview) this.draw(this.preview, 1);
     if (this.textPreview) this.draw(this.textPreview, 1);

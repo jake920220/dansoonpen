@@ -96,7 +96,8 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     frame(360);
     expect(draws).toHaveLength(1);
     expect(draws[0].color).toBe('#b00');
-    expect(draws[0].alpha).toBeCloseTo(1 - 260 / 350);
+    const progress = 260 / 350;
+    expect(draws[0].alpha).toBeCloseTo(1 - progress * progress * (3 - 2 * progress));
     draws.length = 0;
     frame(5_000);
     expect(draws).toEqual([]);
@@ -116,6 +117,21 @@ describe('CanvasRenderer scheduling and fade ownership', () => {
     draws.length = 0;
     frame(200);
     expect(draws).toEqual([{ color: '#fff', alpha: 1 }]);
+    expect(callbacks.size).toBe(0);
+  });
+
+  it('does not brighten or restart an eraser fade when a delayed removal arrives', () => {
+    const erased = stroke('erased');
+    renderer.fadeOut([erased], 220);
+    frame(110);
+    expect(draws.at(-1)?.alpha).toBe(0.5);
+    renderer.fadeOut([erased], 350);
+    draws.length = 0;
+    frame(165);
+    expect(draws).toEqual([{ color: '#fff', alpha: 0.15625 }]);
+    draws.length = 0;
+    frame(221);
+    expect(draws).toEqual([]);
     expect(callbacks.size).toBe(0);
   });
 

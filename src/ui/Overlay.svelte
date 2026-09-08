@@ -56,6 +56,9 @@
   function renderScene() { const annotations = visibleAnnotations(); renderer?.setScene(annotations); annotationCount = annotations.length; }
   function acceptScene(next: SceneSnapshot, removed: Annotation[] = [], duration?: number) {
     if (next.displayId !== displayId || next.revision < scene.revision) return;
+    // Eraser hits already started their fade locally. The native acknowledgement
+    // can arrive after that animation ends; never resurrect those objects.
+    removed = removed.filter((a) => !erased.has(a.id) && !pendingRemovals.has(a.id));
     const cleared = next.clearGeneration > scene.clearGeneration && scene.revision >= 0;
     if (next.clearGeneration > scene.clearGeneration && scene.revision >= 0) {
       const visible = visibleAnnotations();
@@ -144,8 +147,12 @@
   }
   function hideEraser() { if (eraserCursor) eraserCursor.style.display = 'none'; }
   function erase(from: Point, to: Point) {
-    for (const id of hitTestAnnotationsAlongSegment(visibleAnnotations(), from, to, Math.max(10, localWidth * 2))) erased.add(id);
+    const visible = visibleAnnotations();
+    const hits = new Set(hitTestAnnotationsAlongSegment(visible, from, to, Math.max(10, localWidth * 2)));
+    if (!hits.size) return;
+    for (const id of hits) erased.add(id);
     renderScene();
+    renderer?.fadeOut(visible.filter((a) => hits.has(a.id)), settings.reduceMotion ? 0 : 220);
   }
   function down(event: PointerEvent) {
     if (!drawing || scene.revision < 0 || event.button !== 0 || activePointer !== null) return;
