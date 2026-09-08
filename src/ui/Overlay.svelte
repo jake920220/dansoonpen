@@ -9,7 +9,7 @@
   import ToolbarFrame from './ToolbarFrame.svelte';
   import ColorPalette from './ColorPalette.svelte';
   import { SettingsWriter } from '../app/settings-writer';
-  import { isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
+  import { canvasKey, isMac, isSettingsShortcut, settingsShortcut, matchesShortcut } from '../app/shortcuts';
 
   let { displayId }: { displayId: string } = $props();
   let canvas: HTMLCanvasElement;
@@ -258,14 +258,14 @@
       void action(() => bridge.setMode('interact')); return;
     }
     if (editingInput) return;
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.code === 'KeyZ') {
       event.preventDefault(); void action(event.shiftKey ? bridge.redo : bridge.undo); return;
     }
     if (!native && matchesShortcut(event, settings.clearShortcut)) { event.preventDefault(); void action(bridge.clearAll); return; }
     if (!native && matchesShortcut(event, settings.toggleShortcut)) { event.preventDefault(); void action(() => bridge.setMode('interact')); return; }
     if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && /^Digit[1-3]$/.test(event.code) && !event.repeat) { event.preventDefault(); applyPreset(Number(event.code.slice(-1)) - 1); return; }
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return;
-    const key = event.key.toLowerCase();
+    const key = canvasKey(event);
     const tools: Record<string, Tool> = { p: 'pen', e: 'eraser', t: 'text', a: 'arrow', h: 'highlighter' };
     if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }

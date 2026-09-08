@@ -1,6 +1,14 @@
 export const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 export const settingsShortcut = isMac ? 'Command+Comma' : 'Control+Comma';
 
+// Tool keys follow physical positions even when the active input source is Korean.
+export function canvasKey(event: Pick<KeyboardEvent, 'code' | 'isComposing'>): string {
+  if (event.isComposing) return '';
+  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
+  if (/^Digit[1-6]$/.test(event.code)) return event.code.slice(5);
+  return ({ BracketLeft: '[', BracketRight: ']' }[event.code] ?? '');
+}
+
 type KeyEvent = Pick<KeyboardEvent, 'code' | 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'repeat' | 'isComposing'>;
 export function recordedShortcut(event: KeyEvent): string | null {
   // Physical codes also work with Korean input and Option-produced characters.
