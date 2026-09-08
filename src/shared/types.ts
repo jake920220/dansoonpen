@@ -9,11 +9,12 @@ export interface TextAnnotation {
 }
 export interface ArrowAnnotation { kind: 'arrow'; id: string; start: Point; end: Point; color: string; width: number }
 export type Annotation = StrokeAnnotation | TextAnnotation | ArrowAnnotation;
-export interface BrushSettings { tool: Tool; color: string; width: number; textSize: number; highlighterWidth: number; highlighterOpacity: number }
+export interface BrushSettings { eraserSize: number; tool: Tool; color: string; width: number; textSize: number; highlighterWidth: number; highlighterOpacity: number }
 export interface BrushPreset { name: string; brush: BrushSettings }
 export interface CursorSettings { color: string; size: number; showClicks: boolean }
 export interface CursorFrame { displayId: string; x: number; y: number; visible: boolean; clicks: number; sequence: number }
 export interface AppSettings {
+  eraserSize: number;
   cursor: CursorSettings;
   presets: BrushPreset[];
   version: number; color: string; width: number; textSize: number;
@@ -33,11 +34,12 @@ export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fade
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
   cursor: { color: '#ffcf56', size: 48, showClicks: true },
-  version: 4, color: '#ffcf56', width: 12, textSize: 40,
+  eraserSize: 48,
+  version: 5, color: '#ffcf56', width: 12, textSize: 40,
   presets: [
-    { name: '기본 강조', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 40 } },
-    { name: '빨간 밑줄', brush: { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 40 } },
-    { name: '민트 메모', brush: { tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 44 } },
+    { name: '기본 강조', brush: { eraserSize: 48, tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 40 } },
+    { name: '빨간 밑줄', brush: { eraserSize: 48, tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 40 } },
+    { name: '민트 메모', brush: { eraserSize: 48, tool: 'text', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#57d9c6', width: 6, textSize: 44 } },
   ],
   visibilityShortcut: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? 'Alt+V' : 'Alt+Shift+V',
   quickColors: ['#ffcf56', '#ff6b6b', '#57d9c6', '#78a9ff', '#c4a0ff', '#ffffff'],
@@ -46,7 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export function defaultBrush(settings: AppSettings): BrushSettings {
-  return { tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: settings.color, width: settings.width, textSize: settings.textSize };
+  return { eraserSize: settings.eraserSize, tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: settings.color, width: settings.width, textSize: settings.textSize };
 }
 
 export const TOOL_LABELS: Record<Tool, string> = { pen: '펜', eraser: '지우개', text: '텍스트', arrow: '화살표', highlighter: '형광펜' };

@@ -46,7 +46,7 @@
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
   let brush = $derived({ ...(appState?.brush ?? defaultBrush(DEFAULT_SETTINGS)), ...optimisticBrush });
   let tool = $derived(brush.tool);
-  let activeWidth = $derived(tool === 'highlighter' ? brush.highlighterWidth : localWidth);
+  let activeWidth = $derived(tool === 'highlighter' ? brush.highlighterWidth : tool === 'eraser' ? brush.eraserSize : localWidth);
   let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
 
   function visibleAnnotations(): Annotation[] {
@@ -163,7 +163,7 @@
   function hideEraser() { if (eraserCursor) eraserCursor.style.display = 'none'; }
   function erase(from: Point, to: Point) {
     const visible = visibleAnnotations();
-    const hits = new Set(hitTestAnnotationsAlongSegment(visible, from, to, Math.max(10, localWidth * 2)));
+    const hits = new Set(hitTestAnnotationsAlongSegment(visible, from, to, brush.eraserSize / 2));
     if (!hits.size) return;
     for (const id of hits) erased.add(id);
     renderScene();
@@ -304,7 +304,7 @@
     try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
     catch (e) { error = message(e); }
   }
-  function setWidth(width: number) { updateBrush(tool === 'highlighter' ? { highlighterWidth: width } : { width }); }
+  function setWidth(width: number) { updateBrush(tool === 'highlighter' ? { highlighterWidth: width } : tool === 'eraser' ? { eraserSize: width } : { width }); }
   function keyboard(event: KeyboardEvent) {
     if (!drawing) return;
     if ((!native || !isMac) && isSettingsShortcut(event)) { event.preventDefault(); void action(bridge.showControl); return; }
@@ -331,7 +331,7 @@
     if (key === 'c') { event.preventDefault(); void action(bridge.toggleCursor); }
     else if (tools[key]) { event.preventDefault(); chooseTool(tools[key]); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); updateBrush({ color: settings.quickColors[Number(key) - 1] }); }
-    else if (key === '[' || key === ']') { event.preventDefault(); setWidth(Math.max(tool === 'highlighter' ? 8 : 1, Math.min(tool === 'highlighter' ? 64 : 32, activeWidth + (key === ']' ? 1 : -1)))); }
+    else if (key === '[' || key === ']') { event.preventDefault(); setWidth(Math.max(tool === 'highlighter' ? 8 : tool === 'eraser' ? 16 : 1, Math.min(tool === 'highlighter' ? 64 : tool === 'eraser' ? 128 : 32, activeWidth + (key === ']' ? 1 : -1)))); }
   }
   function textKey(event: KeyboardEvent) {
     if (event.isComposing || composing || event.keyCode === 229 || performance.now() - compositionEndedAt < 50) return;
@@ -343,7 +343,7 @@
 {#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>이곳에 설명을 그려 보세요.</h1><p>브라우저에서는 그리기 도구만 미리 볼 수 있습니다.</p><div class="preview-note">화면 위의 표시를 유지한 채<br /><strong>다음 이야기로 넘어가세요.</strong></div></div>{/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
-<div bind:this={eraserCursor} class="eraser-cursor" style:width={`${Math.max(10, localWidth * 2) * 2}px`} style:height={`${Math.max(10, localWidth * 2) * 2}px`}></div>
+<div bind:this={eraserCursor} class="eraser-cursor" style:width={`${brush.eraserSize}px`} style:height={`${brush.eraserSize}px`}></div>
 
 {#if appState?.cursorEnabled && appState.activeDisplayId === displayId}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
 
@@ -380,7 +380,7 @@
       <div class="palette-panel">
         <div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{brush.color.toUpperCase()}</code></div>
         <ColorPalette value={brush.color} colors={settings.quickColors} onchange={(color) => updateBrush({ color })} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />
-        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : `${TOOL_LABELS[tool]} 굵기`}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" value={localTextSize} oninput={(e) => updateBrush({ textSize: Number(e.currentTarget.value) })} /><output>{localTextSize}px</output>{:else}<input aria-label="도구 굵기" type="range" min={tool === 'highlighter' ? 8 : 1} max={tool === 'highlighter' ? 64 : 32} step="1" value={activeWidth} oninput={(e) => setWidth(Number(e.currentTarget.value))} /><output>{activeWidth}px</output>{/if}</label>
+        <label class="palette-range"><span>{tool === 'text' ? '글자 크기' : tool === 'eraser' ? '지우개 크기' : `${TOOL_LABELS[tool]} 굵기`}</span>{#if tool === 'text'}<input aria-label="글자 크기" type="range" min="12" max="96" step="2" value={localTextSize} oninput={(e) => updateBrush({ textSize: Number(e.currentTarget.value) })} /><output>{localTextSize}px</output>{:else}<input aria-label="도구 굵기" type="range" min={tool === 'highlighter' ? 8 : tool === 'eraser' ? 16 : 1} max={tool === 'highlighter' ? 64 : tool === 'eraser' ? 128 : 32} step="1" value={activeWidth} oninput={(e) => setWidth(Number(e.currentTarget.value))} /><output>{activeWidth}px</output>{/if}</label>
         {#if tool === 'highlighter'}<label class="palette-range"><span>불투명도</span><input aria-label="형광펜 불투명도" type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
         <div class="brush-reset"><span>현재 도구에만 적용됩니다.</span><button onclick={resetBrush}>기본 펜으로</button></div>
         <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>

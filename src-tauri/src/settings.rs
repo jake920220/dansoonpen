@@ -63,6 +63,9 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
         }
         settings.version = 4;
     }
+    if settings.version == 4 {
+        settings.version = 5;
+    }
     settings.validate()?;
     Ok(settings)
 }
@@ -107,6 +110,56 @@ pub fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn legacy_eraser_size_is_independent_and_custom_values_round_trip() {
+        use crate::model::{BrushPatch, BrushSettings};
+        let path =
+            std::env::temp_dir().join(format!("my-brush-eraser-{}.json", std::process::id()));
+        let mut json = serde_json::to_value(AppSettings::default()).unwrap();
+        json["version"] = 4.into();
+        json["width"] = 3.into();
+        json.as_object_mut().unwrap().remove("eraserSize");
+        for preset in json["presets"].as_array_mut().unwrap() {
+            preset["brush"]
+                .as_object_mut()
+                .unwrap()
+                .remove("eraserSize");
+        }
+        std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+        let mut loaded = load(&path).unwrap();
+        assert_eq!(loaded.width, 3.);
+        assert_eq!(loaded.eraser_size, 48.);
+        assert!(loaded.presets.iter().all(|p| p.brush.eraser_size == 48.));
+        let original = BrushSettings::from_defaults(&loaded);
+        let brush = BrushPatch {
+            eraser_size: Some(96.),
+            ..Default::default()
+        }
+        .apply(&original);
+        assert_eq!(brush.width, 3.);
+        assert_eq!(brush.highlighter_width, original.highlighter_width);
+        let brush = BrushPatch {
+            width: Some(20.),
+            ..Default::default()
+        }
+        .apply(&brush);
+        assert_eq!(brush.eraser_size, 96.);
+        for invalid in [0., 15., 129., f64::NAN, f64::INFINITY] {
+            assert!(BrushPatch {
+                eraser_size: Some(invalid),
+                ..Default::default()
+            }
+            .apply(&brush)
+            .validate()
+            .is_err());
+        }
+        loaded.eraser_size = 80.;
+        loaded.presets[1].brush.eraser_size = 96.;
+        save(&path, &loaded).unwrap();
+        assert_eq!(load(&path).unwrap(), loaded);
+        std::fs::remove_file(path).unwrap();
+    }
+
     use super::*;
     #[test]
     fn lecture_text_size_migrates_once_and_preserves_custom_preferences() {
@@ -172,7 +225,7 @@ mod tests {
         settings.toggle_shortcut = "Command+Shift+D".into();
         std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 4);
+        assert_eq!(loaded.version, 5);
         assert_eq!(loaded.width, 19.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.toggle_shortcut, settings.toggle_shortcut);
@@ -211,7 +264,7 @@ mod tests {
         json.as_object_mut().unwrap().remove("presets");
         std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 4);
+        assert_eq!(loaded.version, 5);
         assert_eq!(loaded.width, 17.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.presets.len(), 3);

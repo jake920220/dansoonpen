@@ -42,7 +42,7 @@ export const preview = {
       case 'update_settings': {
         const patch = structuredClone(args.settings as Partial<AppState['settings']>);
         state.settings = { ...state.settings, ...patch };
-        for (const key of ['color', 'width', 'textSize'] as const) {
+        for (const key of ['color', 'width', 'textSize', 'eraserSize'] as const) {
           if (key in patch) Object.assign(state.brush, { [key]: patch[key] });
         }
         result = updateState(); break;

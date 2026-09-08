@@ -147,6 +147,8 @@ pub enum Tool {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BrushSettings {
+    #[serde(default = "eraser_size")]
+    pub eraser_size: f64,
     #[serde(default = "marker_width")]
     pub highlighter_width: f64,
     #[serde(default = "marker_opacity")]
@@ -159,6 +161,7 @@ pub struct BrushSettings {
 impl BrushSettings {
     pub fn from_defaults(settings: &AppSettings) -> Self {
         Self {
+            eraser_size: settings.eraser_size,
             tool: Tool::Pen,
             highlighter_width: marker_width(),
             highlighter_opacity: marker_opacity(),
@@ -168,7 +171,8 @@ impl BrushSettings {
         }
     }
     pub fn validate(&self) -> Result<(), String> {
-        if valid_color(&self.color)
+        if finite_range(self.eraser_size, 16., 128.)
+            && valid_color(&self.color)
             && finite_range(self.width, 1., 32.)
             && finite_range(self.text_size, 8., 144.)
             && finite_range(self.highlighter_width, 8., 64.)
@@ -183,6 +187,7 @@ impl BrushSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BrushPatch {
+    pub eraser_size: Option<f64>,
     pub highlighter_width: Option<f64>,
     pub highlighter_opacity: Option<f64>,
     pub tool: Option<Tool>,
@@ -193,6 +198,7 @@ pub struct BrushPatch {
 impl BrushPatch {
     pub fn apply(self, current: &BrushSettings) -> BrushSettings {
         BrushSettings {
+            eraser_size: self.eraser_size.unwrap_or(current.eraser_size),
             highlighter_width: self.highlighter_width.unwrap_or(current.highlighter_width),
             highlighter_opacity: self
                 .highlighter_opacity
@@ -220,6 +226,7 @@ fn default_presets() -> Vec<BrushPreset> {
     .map(|(name, tool, color, width, text_size)| BrushPreset {
         name: name.into(),
         brush: BrushSettings {
+            eraser_size: eraser_size(),
             highlighter_width: marker_width(),
             highlighter_opacity: marker_opacity(),
             tool,
@@ -249,6 +256,8 @@ impl Default for CursorSettings {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AppSettings {
+    #[serde(default = "eraser_size")]
+    pub eraser_size: f64,
     #[serde(default)]
     pub cursor: CursorSettings,
     #[serde(default = "default_presets")]
@@ -264,6 +273,9 @@ pub struct AppSettings {
     pub visibility_shortcut: String,
     pub reduce_motion: bool,
 }
+fn eraser_size() -> f64 {
+    48.
+}
 fn visibility_shortcut() -> String {
     if cfg!(target_os = "macos") {
         "Alt+V"
@@ -275,7 +287,8 @@ fn visibility_shortcut() -> String {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            version: 4,
+            version: 5,
+            eraser_size: eraser_size(),
             cursor: CursorSettings::default(),
             presets: default_presets(),
             color: "#ffcf56".into(),
@@ -327,7 +340,8 @@ impl AppSettings {
     pub fn validate(&self) -> Result<(), String> {
         if !valid_color(&self.cursor.color)
             || !finite_range(self.cursor.size, 24., 96.)
-            || self.version != 4
+            || self.version != 5
+            || !finite_range(self.eraser_size, 16., 128.)
             || self.presets.len() != 3
             || self.presets.iter().any(|p| {
                 p.name.trim().is_empty()
@@ -354,6 +368,7 @@ impl AppSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub eraser_size: Option<f64>,
     pub cursor: Option<CursorSettings>,
     pub presets: Option<Vec<BrushPreset>>,
     pub version: Option<u32>,
@@ -369,6 +384,7 @@ pub struct SettingsPatch {
 impl SettingsPatch {
     pub fn brush_patch(&self) -> BrushPatch {
         BrushPatch {
+            eraser_size: self.eraser_size,
             color: self.color.clone(),
             width: self.width,
             text_size: self.text_size,
@@ -377,6 +393,7 @@ impl SettingsPatch {
     }
     pub fn apply(self, current: &AppSettings) -> AppSettings {
         AppSettings {
+            eraser_size: self.eraser_size.unwrap_or(current.eraser_size),
             cursor: self.cursor.unwrap_or_else(|| current.cursor.clone()),
             presets: self.presets.unwrap_or_else(|| current.presets.clone()),
             version: self.version.unwrap_or(current.version),
