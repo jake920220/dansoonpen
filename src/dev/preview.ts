@@ -82,7 +82,7 @@ export const preview = {
         if (hadInk) { history.push(scene.annotations); future = []; historyRevision++; }
         scene.clearGeneration++;
         updateScene([], scene.annotations);
-        state.mode = 'interact'; state.clearUndoToken = hadInk ? historyRevision : null;
+        state.clearUndoToken = hadInk ? historyRevision : null;
         feedback(hadInk ? '필기를 지웠습니다' : '지울 필기가 없습니다'); updateState();
         break;
       }

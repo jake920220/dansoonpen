@@ -263,14 +263,6 @@ fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
     }
 }
 fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> Result<(), String> {
-    change_mode_with_feedback(app, data, mode, true)
-}
-fn change_mode_with_feedback(
-    app: &tauri::AppHandle,
-    data: &mut RuntimeState,
-    mode: Mode,
-    announce: bool,
-) -> Result<(), String> {
     let changed_mode = data.app.mode != mode;
     diagnostics::record(app, "mode.begin", json!({"from":data.app.mode,"to":mode}));
     let result = (|| {
@@ -304,7 +296,7 @@ fn change_mode_with_feedback(
     match result {
         Ok(()) => {
             data.app.complete_mode(mode);
-            if changed_mode && announce {
+            if changed_mode {
                 feedback(
                     data,
                     if mode == Mode::Draw {
@@ -400,10 +392,10 @@ async fn toggle_annotations(window: WebviewWindow, app: tauri::AppHandle) -> Res
     })
     .await
 }
-fn clear_and_interact(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
-    clear_scope_and_interact(app, data, None)
+fn clear_annotations(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
+    clear_scope(app, data, None)
 }
-fn clear_scope_and_interact(
+fn clear_scope(
     app: &tauri::AppHandle,
     data: &mut RuntimeState,
     display: Option<String>,
@@ -414,8 +406,8 @@ fn clear_scope_and_interact(
         "clear.begin",
         json!({"scope":display.as_deref().map(label), "all":display.is_none(), "mode":data.app.mode, "fadeMs":duration}),
     );
-    // Advance the clear generation before mode-exit handlers can submit a final edit.
-    // Keep the overlay visible so its existing fade can finish after input is released.
+    // Invalidate pending edits while preserving mode, brush and native input/focus.
+    // The overlay stays active so new-generation strokes can begin during the fade.
     let updates = if let Some(id) = display {
         data.scenes.clear_display(&id, duration)?
     } else {
@@ -428,9 +420,6 @@ fn clear_scope_and_interact(
     } else {
         None
     };
-    if data.app.mode == Mode::Draw {
-        change_mode_with_feedback(app, data, Mode::Interact, false)?;
-    }
     feedback(
         data,
         if removed_count > 0 {
@@ -809,7 +798,7 @@ async fn clear_all(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), S
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
-        clear_and_interact(&app, &mut d)
+        clear_annotations(&app, &mut d)
     })
     .await
 }
@@ -824,7 +813,7 @@ async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(
             .active_display_id
             .clone()
             .ok_or("연결된 화면이 없습니다.")?;
-        clear_scope_and_interact(&app, &mut data, Some(id))
+        clear_scope(&app, &mut data, Some(id))
     })
     .await
 }
@@ -1030,11 +1019,11 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                         }
                         "clear-current" => {
                             if let Some(id) = d.app.active_display_id.clone() {
-                                let _ = clear_scope_and_interact(app, &mut d, Some(id));
+                                let _ = clear_scope(app, &mut d, Some(id));
                             }
                         }
                         "clear" => {
-                            let _ = clear_and_interact(app, &mut d);
+                            let _ = clear_annotations(app, &mut d);
                         }
                         _ => {}
                     }
@@ -1116,7 +1105,7 @@ pub fn run() {
                                 .is_ok_and(|s| s.id() == id)
                             {
                                 diagnostics::record(&handle, "shortcut.action", json!({"received":received,"action":"clear"}));
-                                let _ = clear_and_interact(&handle, &mut d);
+                                let _ = clear_annotations(&handle, &mut d);
                             } else if Shortcut::from_str(&d.app.settings.visibility_shortcut)
                                 .is_ok_and(|s| s.id() == id)
                             {

@@ -12,7 +12,7 @@ Commands (Tauri invoke):
 - `capture_shortcut { active }` -> void; control window only. Suspend the app's global shortcuts while its focused recorder captures a key combination. Restore on exit, native focus loss or control close.
 - `get_scene { displayId }` -> SceneSnapshot
 - `apply_edit { edit: SceneEdit }` -> SceneSnapshot; add/remove as one undoable edit
-- `clear_all` -> void; remove existing annotations from all displays in one undoable action, then leave draw mode and release input/restore prior app focus immediately while the fade continues. Advance clear generation before publishing the mode change. The global clear shortcut and tray call the same native routine. If already interacting, preserve current app focus.
+- `clear_all` -> void; remove existing annotations from all displays in one undoable action, preserving mode, brush, toolbar and native input/focus throughout the fade. Advance clear generation to invalidate pending edits; new-generation strokes survive. The global clear shortcut and tray call the same native routine. Empty clears also preserve the current mode.
 - `undo_clear { token }` -> void; restore the issued clear only while its history revision is unchanged. Preserve mode/focus and reject after any new edit/undo/redo.
 - `undo` / `redo` -> void; global chronological undo, including all-monitor clear
 - `show_control` -> void
@@ -39,7 +39,7 @@ V0.2 adds arrows and highlighter strokes. `stroke.opacity` defaults to 1 for old
 
 ## 선택한 화면 삭제
 
-`clear_current`는 현재 선택한 모니터만 수동 fade로 지우고 앱 조작으로 복귀한다. 다른 모니터의 장면·revision·clearGeneration에는 영향을 주지 않는다. clearGeneration은 **모니터별**로 관리하며 전체 삭제는 각 모니터 값을 각각 증가시킨다. 전체 삭제는 계속 하나의 undo이고, 선택 삭제의 undo/redo는 해당 모니터만 변경한다. 빈 장면의 삭제도 진행 중 획을 무효화할 세대 이벤트를 보낸다.
+`clear_current`는 현재 선택한 모니터만 수동 fade로 지우고 현재 모드·도구·입력 포커스를 유지한다. 다른 모니터의 장면·revision·clearGeneration에는 영향을 주지 않는다. clearGeneration은 **모니터별**로 관리하며 전체 삭제는 각 모니터 값을 각각 증가시킨다. 전체 삭제는 계속 하나의 undo이고, 선택 삭제의 undo/redo는 해당 모니터만 변경한다. 빈 장면의 삭제도 진행 중 획을 무효화할 세대 이벤트를 보낸다.
 
 ## 커서 강조
 
