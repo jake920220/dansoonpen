@@ -261,5 +261,18 @@
   "{e}; 단축키 복원 실패: {r}. 트레이에서 복구하세요.": "{e}; shortcut recovery failed: {r}. Use the tray menu to recover.",
   "단축키 변경 및 복원에 실패했습니다. 트레이에서 입력을 복구하고 단축키를 다시 설정하세요: {error}; {rollback}": "Shortcut update and recovery failed. Release input from the tray menu and set the shortcuts again: {error}; {rollback}",
   "단축키 변경에 실패하여 이전 단축키를 유지했습니다. 다른 앱과의 충돌을 확인하세요: {error}": "Could not update shortcuts; the previous bindings were kept. Check for conflicts with other apps: {error}",
-  "입력 복구 중 창을 숨겼습니다: {}": "Windows were hidden while releasing input: {}"
+  "입력 복구 중 창을 숨겼습니다: {}": "Windows were hidden while releasing input: {}",
+  "커서가 있는 화면 필기 지우기": "Clear display under cursor",
+  "연결된 모든 화면에서 필기": "Draw on every connected display",
+  "{0}개 화면 · 커서를 옮겨 바로 그리세요": "{0} displays · move your cursor and draw",
+  "연결된 화면을 찾고 있습니다": "Looking for connected displays",
+  "모든 화면에서 커서 강조": "Highlight the cursor on all displays",
+  "다른 모니터로도 드래그해서 이동 · 방향키 이동 · 두 번 클릭 또는 Home으로 위치 초기화": "Drag across displays · arrow keys to move · double-click or Home to reset",
+  "표시된 도구막대의 손잡이를 사용해 주세요.": "Use the handle on the visible toolbar.",
+  "도구막대 이동 좌표가 올바르지 않습니다.": "Invalid toolbar position.",
+  "현재 도구막대에서 위치를 바꿔 주세요.": "Change the position from the current toolbar.",
+  "기본 화면을 찾지 못했습니다.": "Could not find the primary display.",
+  "필기 창을 찾지 못했습니다.": "Could not find the annotation window.",
+  "지우려는 화면의 필기 도구에서 실행해 주세요.": "Run this action from the toolbar on the display you want to clear.",
+  "필기 창 활성화는 메인 스레드에서 실행해야 합니다.": "Annotation window activation must run on the main thread."
 }

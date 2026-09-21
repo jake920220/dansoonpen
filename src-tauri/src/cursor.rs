@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
@@ -34,12 +35,25 @@ pub struct Frame {
 }
 #[derive(Default)]
 pub struct Stream {
-    pub latest: Option<Frame>,
+    latest: HashMap<String, Frame>,
     sequence: u64,
 }
 impl Stream {
+    pub fn clear(&mut self) {
+        self.latest.clear();
+    }
+    pub fn for_window(&self, window: &str) -> Option<&Frame> {
+        self.latest
+            .values()
+            .find(|frame| crate::label(&frame.reading.display_id) == window)
+    }
+
     fn update(&mut self, reading: Reading) -> Option<Frame> {
-        if self.latest.as_ref().is_some_and(|f| f.reading == reading) {
+        if self
+            .latest
+            .get(&reading.display_id)
+            .is_some_and(|f| f.reading == reading)
+        {
             return None;
         }
         self.sequence += 1;
@@ -47,7 +61,8 @@ impl Stream {
             reading,
             sequence: self.sequence,
         };
-        self.latest = Some(frame.clone());
+        self.latest
+            .insert(frame.reading.display_id.clone(), frame.clone());
         Some(frame)
     }
 }
@@ -99,23 +114,62 @@ pub(crate) fn poll(app: &tauri::AppHandle, data: &mut crate::RuntimeState) -> Re
     if !data.app.cursor_enabled {
         return Ok(());
     }
-    let Some(id) = data.app.active_display_id.as_ref() else {
-        return Ok(());
-    };
-    let Some(window) = app.get_webview_window(&crate::label(id)) else {
-        return Ok(());
-    };
-    let reading = crate::platform::cursor_reading(&window, id.clone())?;
-    if let Some(frame) = data.cursor.update(reading) {
-        window
-            .emit("brush-cursor", frame)
-            .map_err(|e| e.to_string())?;
+    for display in data.app.displays.iter().filter(|d| d.connected) {
+        let Some(window) = app.get_webview_window(&crate::label(&display.id)) else {
+            continue;
+        };
+        let reading = crate::platform::cursor_reading(&window, display.id.clone())?;
+        if let Some(frame) = data.cursor.update(reading) {
+            window
+                .emit("brush-cursor", frame)
+                .map_err(|e| e.to_string())?;
+        }
     }
     Ok(())
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn moving_between_displays_hides_previous_halo_without_idle_traffic() {
+        let mut stream = Stream::default();
+        let a = Reading::local("external".into(), 10., 20., 2560., 1440., 1);
+        let b = Reading::local("retina".into(), -2550., 20., 1470., 956., 1);
+        assert!(stream.update(a.clone()).unwrap().reading.visible);
+        assert!(!stream.update(b.clone()).unwrap().reading.visible);
+        assert!(stream.update(a).is_none());
+        assert!(stream.update(b).is_none());
+        let hidden = stream
+            .update(Reading::local(
+                "external".into(),
+                2600.,
+                20.,
+                2560.,
+                1440.,
+                1,
+            ))
+            .unwrap();
+        let visible = stream
+            .update(Reading::local("retina".into(), 40., 20., 1470., 956., 1))
+            .unwrap();
+        assert!(!hidden.reading.visible);
+        assert!(visible.reading.visible);
+        assert!(visible.sequence > hidden.sequence);
+        assert_eq!(
+            stream
+                .for_window(&crate::label("external"))
+                .unwrap()
+                .reading,
+            hidden.reading
+        );
+        assert_eq!(
+            stream.for_window(&crate::label("retina")).unwrap().reading,
+            visible.reading
+        );
+        stream.clear();
+        assert!(stream.for_window(&crate::label("retina")).is_none());
+        assert!(stream.update(visible.reading).unwrap().sequence > visible.sequence);
+    }
     #[test]
     fn outside_coordinates_never_leak_and_idle_frames_are_suppressed() {
         let mut stream = Stream::default();

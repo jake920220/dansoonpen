@@ -37,6 +37,30 @@ impl PreviousFocus {
 pub fn configure_overlay(_window: &WebviewWindow) -> Result<(), String> {
     Ok(())
 }
+pub fn place_overlay(
+    window: &WebviewWindow,
+    display: &crate::model::DisplayInfo,
+    _desktop_top: f64,
+) -> Result<(), String> {
+    window
+        .set_position(tauri::PhysicalPosition::new(display.x, display.y))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(tauri::PhysicalSize::new(display.width, display.height))
+        .map_err(|e| e.to_string())
+}
+pub fn show_overlay(window: &WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())
+}
+pub fn set_overlay_input(window: &WebviewWindow, enabled: bool) -> Result<(), String> {
+    window
+        .set_ignore_cursor_events(!enabled)
+        .map_err(|e| e.to_string())?;
+    window.set_focusable(enabled).map_err(|e| e.to_string())
+}
+pub fn focus_overlay(window: &WebviewWindow) -> Result<(), String> {
+    window.set_focus().map_err(|e| e.to_string())
+}
 pub fn window_diagnostics(window: &WebviewWindow) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "positionPhysical":window.outer_position().ok(), "sizePhysical":window.outer_size().ok(),

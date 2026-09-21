@@ -22,7 +22,7 @@
   let captureEdits: Promise<void> = Promise.resolve();
   let recording = $state(false);
   let ready = $derived(appState !== null && !busy);
-  const selected = $derived(appState?.displays.find((d) => d.id === appState?.activeDisplayId));
+  const connectedDisplays = $derived(appState?.displays.filter((d) => d.connected) ?? []);
 
   function accept(next: AppState) {
     if (appState && next.revision < appState.revision) return;
@@ -109,8 +109,7 @@
       <div class="session-actions"><button class="secondary" disabled={!ready} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={18} />{appState?.annotationsVisible ? $t("필기 잠시 숨기기") : $t("숨긴 필기 다시 표시")}<kbd>{shortcutLabel(draft.visibilityShortcut)}</kbd></button><span>{appState?.annotationsVisible ? $t("내용과 실행 취소 기록은 유지됩니다.") : $t("필기를 숨겼습니다. 다시 그리면 자동으로 표시됩니다.")}</span></div>
       <section class="display-card">
         <div class="card-icon"><Icon name="monitor" size={24} /></div>
-        <div class="display-details"><h2>{$t("그릴 화면")}</h2><p>{selected ? $t("{0} × {1} · {2}% 배율", [Math.round(selected.width), Math.round(selected.height), Math.round(selected.scaleFactor * 100)]) : $t("화면을 찾고 있습니다")}</p></div>
-        <select aria-label={$t("그릴 화면 선택")} value={appState?.activeDisplayId ?? ''} disabled={!ready} onchange={(e) => { const selectedId = e.currentTarget.value; void action(async () => accept(await bridge.selectDisplay(selectedId))); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as display}<option value={display.id}>{$t(display.name)}{display.isPrimary ? $t(" · 기본") : ''}</option>{/each}</select>
+        <div class="display-details"><h2>{$t("연결된 모든 화면에서 필기")}</h2><p>{connectedDisplays.length ? $t("{0}개 화면 · 커서를 옮겨 바로 그리세요", [connectedDisplays.length]) : $t("연결된 화면을 찾고 있습니다")}</p></div>
       </section>
       <section class="quick-guide" aria-label={$t("사용 순서")}>
         <div><span class="step-number">01</span><h3>{$t("그리고")}</h3><p>{$t("펜·색상·굵기를 골라")}<br />{$t("필요한 곳에 표시하세요.")}</p></div>
@@ -147,7 +146,7 @@
           {/each}
         </section>
         <section class="settings-section"><h2><Icon name="cursor-halo" size={18} />{$t("커서 강조")}</h2>
-          <label class="checkbox-row"><span><strong>{$t("선택한 화면에서 커서 강조")}</strong><small>{$t("앱 조작 중에도 표시합니다. 앱을 다시 실행하면 꺼집니다.")}</small></span><input type="checkbox" checked={appState?.cursorEnabled ?? false} onchange={() => action(bridge.toggleCursor)} /></label>
+          <label class="checkbox-row"><span><strong>{$t("모든 화면에서 커서 강조")}</strong><small>{$t("앱 조작 중에도 표시합니다. 앱을 다시 실행하면 꺼집니다.")}</small></span><input type="checkbox" checked={appState?.cursorEnabled ?? false} onchange={() => action(bridge.toggleCursor)} /></label>
           <div class="cursor-settings-preview"><span class="cursor-sample" style:--cursor-color={draft.cursor.color} style:width={`${draft.cursor.size}px`} style:height={`${draft.cursor.size}px`}><Icon name="pointer" size={18} /></span><div class="cursor-colors">{#each draft.quickColors as color}<button type="button" aria-label={$t("커서 색상 {0}", [color])} aria-pressed={draft.cursor.color === color} style:background={color} onclick={() => appearance({ cursor: { ...draft.cursor, color } })}></button>{/each}</div></div>
           <div class="setting-row"><label for="cursor-size">{$t("강조 원 크기")}</label><div class="range-value"><input id="cursor-size" type="range" min="24" max="96" step="2" value={draft.cursor.size} oninput={(e) => appearance({ cursor: { ...draft.cursor, size: Number(e.currentTarget.value) } })} /><output>{draft.cursor.size}px</output></div></div>
           <label class="checkbox-row"><span><strong>{$t("클릭 위치 표시")}</strong><small>{$t("왼쪽 클릭에 짧은 원을 표시합니다.")}</small></span><input type="checkbox" checked={draft.cursor.showClicks} onchange={(e) => appearance({ cursor: { ...draft.cursor, showClicks: e.currentTarget.checked } })} /></label>
@@ -161,7 +160,7 @@
           <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; draft.visibilityShortcut = DEFAULT_SETTINGS.visibilityShortcut; change(); }}>{$t("왼손 추천 조합")}</button><span class="success" role="status">{saved ? $t("단축키를 적용했습니다.") : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>{$t("단축키 적용")}</button></div>
         </section>
         <section class="settings-section"><label class="checkbox-row"><span><strong>{$t("애니메이션 줄이기")}</strong><small>{$t("지우기 명령을 누르면 그림을 즉시 지웁니다.")}</small></span><input type="checkbox" checked={draft.reduceMotion} onchange={(e) => appearance({ reduceMotion: e.currentTarget.checked })} /></label></section>
-        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, visibilityShortcut, language: _language, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; draft.visibilityShortcut = visibilityShortcut; change(); }}>{$t("기본값으로")}</button></div>
+        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, visibilityShortcut, language: _language, toolbar: _toolbar, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; draft.visibilityShortcut = visibilityShortcut; change(); }}>{$t("기본값으로")}</button></div>
         </fieldset>
       </form>
     {:else}

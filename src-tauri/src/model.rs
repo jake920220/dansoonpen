@@ -266,6 +266,8 @@ pub enum Language {
 pub struct AppSettings {
     #[serde(default)]
     pub language: Language,
+    #[serde(default)]
+    pub toolbar: crate::toolbar::Preferences,
     #[serde(default = "eraser_size")]
     pub eraser_size: f64,
     #[serde(default)]
@@ -299,6 +301,7 @@ impl Default for AppSettings {
         Self {
             version: 6,
             language: Language::Ko,
+            toolbar: crate::toolbar::Preferences::default(),
             eraser_size: eraser_size(),
             cursor: CursorSettings::default(),
             presets: default_presets(),
@@ -349,7 +352,8 @@ impl AppSettings {
         Ok(next)
     }
     pub fn validate(&self) -> Result<(), String> {
-        if !valid_color(&self.cursor.color)
+        if !self.toolbar.valid()
+            || !valid_color(&self.cursor.color)
             || !finite_range(self.cursor.size, 24., 96.)
             || self.version != 6
             || !finite_range(self.eraser_size, 16., 128.)
@@ -406,6 +410,7 @@ impl SettingsPatch {
     pub fn apply(self, current: &AppSettings) -> AppSettings {
         AppSettings {
             language: self.language.unwrap_or(current.language),
+            toolbar: current.toolbar.clone(),
             eraser_size: self.eraser_size.unwrap_or(current.eraser_size),
             cursor: self.cursor.unwrap_or_else(|| current.cursor.clone()),
             presets: self.presets.unwrap_or_else(|| current.presets.clone()),
@@ -458,7 +463,6 @@ pub struct AppState {
     pub cursor_enabled: bool,
     pub annotations_visible: bool,
     pub mode: Mode,
-    pub active_display_id: Option<String>,
     pub displays: Vec<DisplayInfo>,
     pub settings: AppSettings,
     pub brush: BrushSettings,
@@ -466,7 +470,7 @@ pub struct AppState {
     pub error: Option<String>,
 }
 impl AppState {
-    // Called only after native input/focus transition succeeds. Re-selecting a
+    // Called only after native input/focus transition succeeds. Reconnecting a
     // display while already drawing must not reset the current tool.
     pub fn complete_mode(&mut self, mode: Mode) {
         if mode == Mode::Draw && self.mode != Mode::Draw {
@@ -766,7 +770,6 @@ mod tests {
             cursor_enabled: false,
             annotations_visible: true,
             mode: Mode::Interact,
-            active_display_id: None,
             displays: vec![],
             brush: BrushSettings::from_defaults(&settings),
             settings,

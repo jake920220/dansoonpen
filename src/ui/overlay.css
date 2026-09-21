@@ -1,3 +1,6 @@
+.overlay-document, .overlay-document body, .overlay-document #app { user-select: none; -webkit-user-select: none; }
+.overlay-document input, .overlay-document textarea { user-select: text; -webkit-user-select: text; }
+.overlay-document * { -webkit-user-drag: none; }
 .drawing-surface { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; touch-action: none; }
 .drawing-surface.enabled { pointer-events: auto; cursor: crosshair; }
 .drawing-surface.text-tool { cursor: text; }

@@ -9,7 +9,7 @@ let state: AppState = {
   brushGeneration: 0,
   cursorEnabled: false, annotationsVisible: true,
   mode: new URLSearchParams(location.search).get('view') === 'overlay' ? 'draw' : 'interact',
-  activeDisplayId: displayId, revision: 1, error: null,
+  revision: 1, error: null,
   settings: structuredClone(DEFAULT_SETTINGS), brush: defaultBrush(DEFAULT_SETTINGS),
   displays: [{ id: displayId, name: '미리보기 화면', x: 0, y: 0, width: window.innerWidth, height: window.innerHeight, scaleFactor: devicePixelRatio, isPrimary: true, connected: true }],
 };
@@ -47,7 +47,6 @@ export const preview = {
         }
         state.mode = args.mode as AppState['mode']; if (state.mode === 'draw') state.annotationsVisible = true; result = updateState(); break;
       }
-      case 'select_display': state.activeDisplayId = String(args.displayId); result = updateState(); break;
       case 'update_settings': {
         const patch = structuredClone(args.settings as Partial<AppState['settings']>);
         state.settings = { ...state.settings, ...patch };

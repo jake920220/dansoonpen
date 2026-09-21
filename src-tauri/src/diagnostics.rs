@@ -248,7 +248,7 @@ pub fn state(app: &tauri::AppHandle, data: &crate::RuntimeState, reason: &'stati
         "state.snapshot",
         json!({
             "reason": reason, "mode": data.app.mode, "revision": data.app.revision,
-            "activeWindow": data.app.active_display_id.as_deref().map(crate::label),
+            "drawingWindows": data.app.displays.iter().filter(|d| d.connected && data.app.mode == crate::model::Mode::Draw).map(|d| crate::label(&d.id)).collect::<Vec<_>>(),
             "annotationsVisible": data.app.annotations_visible, "cursorEnabled": data.app.cursor_enabled,
             "captureShortcut": data.capturing_shortcut, "pressedIds": data.pressed,
             "registeredIds": data.registered.iter().map(|k| k.id()).collect::<Vec<_>>(),

@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { AppSettings, AppState, CursorFrame, BrushSettings, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
+import type { ToolbarPreferences, ToolbarState, AppSettings, AppState, CursorFrame, BrushSettings, Mode, SceneEdit, SceneSnapshot, SceneUpdate } from '../shared/types';
 
 export const native = isTauri();
 const preview = !native && import.meta.env.DEV ? import('../dev/preview').then((m) => m.preview) : null;
@@ -18,12 +18,16 @@ async function subscribe<T>(event: string, handler: (payload: T) => void): Promi
 }
 
 export const bridge = {
+  getToolbar: () => call<ToolbarState>('get_toolbar'),
+  onToolbar: (handler: (state: ToolbarState) => void) => subscribe('brush-toolbar', handler),
+  beginToolbarDrag: (drag: { token: string; offsetX: number; offsetY: number; width: number; height: number }) => call<void>('begin_toolbar_drag', { drag }),
+  moveToolbar: (token: string, point: { x: number; y: number }, finish = false) => call<void>('move_toolbar', { token, point, finish }),
+  updateToolbar: (position: ToolbarPreferences) => call<void>('update_toolbar', { position }),
   toggleCursor: () => call<void>('toggle_cursor'),
   getCursor: () => call<CursorFrame | null>('get_cursor'),
   onCursor: (handler: (frame: CursorFrame) => void) => subscribe('brush-cursor', handler),
   getState: () => call<AppState>('get_state'),
   setMode: (mode: Mode) => call<AppState>('set_mode', { mode }),
-  selectDisplay: (displayId: string) => call<AppState>('select_display', { displayId }),
   updateSettings: (settings: Partial<AppSettings>) => call<AppState>('update_settings', { settings }),
   updateBrush: (brush: Partial<BrushSettings>, brushGeneration: number) => call<AppState>('update_brush', { brush, brushGeneration }),
   updatePreset: (index: number, name?: string, brush?: BrushSettings) => call<AppState>('update_preset', { index, name, brush }),

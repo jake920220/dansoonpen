@@ -14,8 +14,11 @@ export interface BrushSettings { eraserSize: number; tool: Tool; color: string; 
 export interface BrushPreset { name: string; brush: BrushSettings }
 export interface CursorSettings { color: string; size: number; showClicks: boolean }
 export interface CursorFrame { displayId: string; x: number; y: number; visible: boolean; clicks: number; sequence: number }
+export interface ToolbarPreferences { displayId: string | null; x: number; y: number; collapsed: boolean; detailed: boolean }
+export interface ToolbarState { displayId: string | null; position: ToolbarPreferences; revision: number }
 export interface AppSettings {
   language: Language;
+  toolbar: ToolbarPreferences;
   eraserSize: number;
   cursor: CursorSettings;
   presets: BrushPreset[];
@@ -30,7 +33,7 @@ export interface Feedback { id: number; message: string; createdAtMs: number }
 export interface AppState {
   feedback: Feedback | null; clearUndoToken: number | null;
   brushGeneration: number;
-  cursorEnabled: boolean; annotationsVisible: boolean; mode: Mode; activeDisplayId: string | null; displays: DisplayInfo[];
+  cursorEnabled: boolean; annotationsVisible: boolean; mode: Mode; displays: DisplayInfo[];
   settings: AppSettings; brush: BrushSettings; revision: number; error: string | null;
 }
 export interface SceneSnapshot { displayId: string; revision: number; clearGeneration: number; annotations: Annotation[] }
@@ -38,6 +41,7 @@ export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fade
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
   language: 'ko',
+  toolbar: { displayId: null, x: 0.5, y: 0, collapsed: false, detailed: false },
   cursor: { color: '#ffcf56', size: 48, showClicks: true },
   eraserSize: 48,
   version: 6, color: '#ffcf56', width: 12, textSize: 40,

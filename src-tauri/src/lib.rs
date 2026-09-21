@@ -6,6 +6,7 @@ use i18n::tr;
 mod platform;
 mod settings;
 mod shortcut_registry;
+mod toolbar;
 
 use model::*;
 use serde_json::json;
@@ -13,8 +14,7 @@ use std::{collections::HashSet, path::PathBuf, str::FromStr, sync::Mutex, time::
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder,
+    Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -22,6 +22,7 @@ struct RuntimeState {
     app: AppState,
     scenes: SceneStore,
     cursor: cursor::Stream,
+    toolbar: toolbar::Toolbar,
     previous_focus: platform::PreviousFocus,
     settings_path: PathBuf,
     registered: Vec<Shortcut>,
@@ -48,7 +49,7 @@ impl TrayShortcuts {
             (&self.draw, "그리기"),
             (&self.interact, "앱 조작으로 복귀 (입력 복구)"),
             (&self.clear, "모든 화면 필기 지우기"),
-            (&self.clear_current, "선택한 화면 필기 지우기"),
+            (&self.clear_current, "커서가 있는 화면 필기 지우기"),
             (&self.undo_clear, "방금 지운 필기 되돌리기"),
             (&self.quit, "My Brush 종료"),
         ] {
@@ -84,7 +85,10 @@ async fn native_command<T: Send + 'static, F: FnOnce() -> Result<T, String> + Se
     command: &'static str,
     work: F,
 ) -> Result<T, String> {
-    let verbose = !matches!(command, "apply_edit" | "update_brush" | "get_cursor");
+    let verbose = !matches!(
+        command,
+        "apply_edit" | "update_brush" | "get_cursor" | "move_toolbar"
+    );
     let request = if verbose {
         diagnostics::record(&app, "command.received", json!({"command": command}))
     } else {
@@ -227,53 +231,43 @@ fn ensure_overlay(
             .visible_on_all_workspaces(true)
             .skip_taskbar(true)
             .focused(false)
+            .accept_first_mouse(true)
             .focusable(false)
             .visible(false)
             .resizable(false)
             .build()
             .map_err(|e| e.to_string())?;
-        window
-            .set_ignore_cursor_events(true)
-            .map_err(|e| e.to_string())?;
         platform::configure_overlay(&window)?;
+        // Keep initial and mode-transition input state on the same platform path.
+        // Mixing Tauri's queued cursor-ignore message with synchronous AppKit
+        // updates can let the older creation message overwrite Draw mode later.
+        platform::set_overlay_input(&window, false)?;
         diagnostics::record(app, "overlay.created", json!({"window": name}));
         window
     };
-    // Monitor coordinates are physical pixels. Frontend uses CSS/logical pixels.
-    window
-        .set_size(PhysicalSize::new(display.width, display.height))
-        .map_err(|e| e.to_string())?;
-    window
-        .set_position(PhysicalPosition::new(display.x, display.y))
-        .map_err(|e| e.to_string())?;
+    let desktop_top = data
+        .app
+        .displays
+        .iter()
+        .find(|d| d.connected && d.is_primary)
+        .map(|d| f64::from(d.height) / d.scale_factor)
+        .ok_or("기본 화면을 찾지 못했습니다.")?;
+    platform::place_overlay(&window, display, desktop_top)?;
     diagnostics::record(
         app,
         "overlay.placement_requested",
-        json!({"window": name, "frameMayBePending":true, "target": {"x":display.x,"y":display.y,"width":display.width,"height":display.height,"scale":display.scale_factor}, "native":platform::window_diagnostics(&window).ok()}),
+        json!({"window": name, "frameMayBePending":cfg!(target_os = "windows"), "target": {"x":display.x,"y":display.y,"width":display.width,"height":display.height,"scale":display.scale_factor}, "native":platform::window_diagnostics(&window).ok()}),
     );
     Ok(window)
 }
 fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
     let mut errors = vec![];
-    for (name, w) in app.webview_windows() {
+    for (name, window) in app.webview_windows() {
         if name.starts_with("overlay-") {
-            if let Err(e) = w.set_ignore_cursor_events(true) {
-                diagnostics::record(
-                    app,
-                    "window.input_release_failed",
-                    json!({"window":name, "step":"ignore_cursor"}),
-                );
-                errors.push(e.to_string());
-                let _ = w.hide();
-            }
-            if let Err(e) = w.set_focusable(false) {
-                diagnostics::record(
-                    app,
-                    "window.input_release_failed",
-                    json!({"window":name, "step":"focusable"}),
-                );
-                errors.push(e.to_string());
-                let _ = w.hide();
+            if let Err(error) = platform::set_overlay_input(&window, false) {
+                diagnostics::record(app, "window.input_release_failed", json!({"window":name}));
+                errors.push(error);
+                let _ = window.hide();
             }
         }
     }
@@ -286,31 +280,81 @@ fn release_inputs(app: &tauri::AppHandle) -> Result<(), String> {
         ))
     }
 }
+
+// Input belongs to every connected display. Focus only selects the keyboard recipient.
+fn sync_overlays(app: &tauri::AppHandle, data: &RuntimeState, mode: Mode) -> Result<(), String> {
+    for display in &data.app.displays {
+        let existing = app.get_webview_window(&label(&display.id));
+        if display.connected {
+            if mode == Mode::Draw || data.app.cursor_enabled || existing.is_some() {
+                let window = ensure_overlay(app, data, &display.id)?;
+                platform::set_overlay_input(&window, mode == Mode::Draw)?;
+                platform::show_overlay(&window)?;
+            }
+        } else if let Some(window) = existing {
+            platform::set_overlay_input(&window, false)?;
+            window.hide().map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn display_under_cursor(app: &tauri::AppHandle, data: &RuntimeState) -> Option<String> {
+    data.app
+        .displays
+        .iter()
+        .filter(|d| d.connected)
+        .find_map(|d| {
+            let window = app.get_webview_window(&label(&d.id))?;
+            platform::cursor_reading(&window, d.id.clone())
+                .ok()
+                .filter(|r| r.visible)
+                .map(|r| r.display_id)
+        })
+}
+
 fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> Result<(), String> {
     let changed_mode = data.app.mode != mode;
+    if mode == Mode::Interact {
+        data.toolbar.cancel_drag();
+    }
     diagnostics::record(app, "mode.begin", json!({"from":data.app.mode,"to":mode}));
     let result = (|| {
         diagnostics::record(app, "mode.step", json!({"step":"release_inputs"}));
         release_inputs(app)?;
         if mode == Mode::Draw {
-            let id = data
-                .app
-                .active_display_id
-                .clone()
-                .ok_or("연결된 화면이 없습니다.")?;
-            let window = ensure_overlay(app, data, &id)?;
-            if data.app.mode != Mode::Draw {
+            if !data.app.displays.iter().any(|d| d.connected) {
+                return Err("연결된 화면이 없습니다.".into());
+            }
+            if changed_mode {
                 data.previous_focus.capture();
             }
-            diagnostics::record(app, "mode.step", json!({"step":"show"}));
-            window.show().map_err(|e| e.to_string())?;
-            diagnostics::record(app, "mode.step", json!({"step":"enable_input"}));
-            window.set_focusable(true).map_err(|e| e.to_string())?;
-            window
-                .set_ignore_cursor_events(false)
-                .map_err(|e| e.to_string())?;
-            diagnostics::record(app, "mode.step", json!({"step":"focus"}));
-            window.set_focus().map_err(|e| e.to_string())?;
+            sync_overlays(app, data, Mode::Draw)?;
+            let id = display_under_cursor(app, data)
+                .or_else(|| {
+                    data.app
+                        .displays
+                        .iter()
+                        .find(|d| d.connected && d.is_primary)
+                        .map(|d| d.id.clone())
+                })
+                .or_else(|| {
+                    data.app
+                        .displays
+                        .iter()
+                        .find(|d| d.connected)
+                        .map(|d| d.id.clone())
+                })
+                .ok_or("연결된 화면이 없습니다.")?;
+            let window = app
+                .get_webview_window(&label(&id))
+                .ok_or("필기 창을 찾지 못했습니다.")?;
+            diagnostics::record(
+                app,
+                "mode.step",
+                json!({"step":"focus", "window":window.label()}),
+            );
+            platform::focus_overlay(&window)?;
         } else {
             diagnostics::record(app, "mode.step", json!({"step":"restore_previous_focus"}));
             data.previous_focus.restore()?;
@@ -350,18 +394,16 @@ fn change_mode(app: &tauri::AppHandle, data: &mut RuntimeState, mode: Mode) -> R
     }
 }
 fn toggle_cursor_highlight(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(), String> {
-    if !data.app.cursor_enabled {
-        let id = data
-            .app
-            .active_display_id
-            .clone()
-            .ok_or("연결된 화면이 없습니다.")?;
-        ensure_overlay(app, data, &id)?
-            .show()
-            .map_err(|e| e.to_string())?;
+    let enabled = !data.app.cursor_enabled;
+    if enabled && !data.app.displays.iter().any(|d| d.connected) {
+        return Err("연결된 화면이 없습니다.".into());
     }
-    data.app.cursor_enabled = !data.app.cursor_enabled;
-    data.cursor.latest = None;
+    data.app.cursor_enabled = enabled;
+    if let Err(error) = sync_overlays(app, data, data.app.mode) {
+        data.app.cursor_enabled = !enabled;
+        return Err(error);
+    }
+    data.cursor.clear();
     app.state::<cursor::Monitor>()
         .set_enabled(data.app.cursor_enabled);
     emit_state(app, data);
@@ -387,7 +429,7 @@ async fn get_cursor(
         let state = lock(&app);
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
         cursor::poll(&app, &mut data)?;
-        Ok(data.cursor.latest.clone())
+        Ok(data.cursor.for_window(window.label()).cloned())
     })
     .await
 }
@@ -564,41 +606,14 @@ fn refresh_displays(app: &tauri::AppHandle, data: &mut RuntimeState) -> Result<(
         return Ok(());
     }
     data.app.displays = next;
+    data.toolbar.cancel_drag();
+    toolbar::reconcile(app, data);
     diagnostics::state(app, data, "displays_changed");
-    let active_connected = data
-        .app
-        .active_display_id
-        .as_ref()
-        .is_some_and(|id| connected(data, id));
-    if !active_connected {
-        let _ = change_mode(app, data, Mode::Interact);
-        data.app.active_display_id = data
-            .app
-            .displays
-            .iter()
-            .find(|d| d.connected && d.is_primary)
-            .or_else(|| data.app.displays.iter().find(|d| d.connected))
-            .map(|d| d.id.clone());
+    data.cursor.clear();
+    if data.app.mode == Mode::Draw && !data.app.displays.iter().any(|d| d.connected) {
+        change_mode(app, data, Mode::Interact)?;
     }
-    if data.app.cursor_enabled {
-        if let Some(id) = &data.app.active_display_id {
-            ensure_overlay(app, data, id)?
-                .show()
-                .map_err(|e| e.to_string())?;
-        }
-    }
-    for d in &data.app.displays {
-        if let Some(w) = app.get_webview_window(&label(&d.id)) {
-            if d.connected {
-                ensure_overlay(app, data, &d.id)?;
-                w.show().map_err(|e| e.to_string())?;
-            } else {
-                let _ = w.set_ignore_cursor_events(true);
-                let _ = w.set_focusable(false);
-                w.hide().map_err(|e| e.to_string())?;
-            }
-        }
-    }
+    sync_overlays(app, data, data.app.mode)?;
     emit_state(app, data);
     diagnostics::windows(app, "displays_changed");
     Ok(())
@@ -622,31 +637,6 @@ async fn set_mode(
         authorized(&window)?;
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
-        change_mode(&app, &mut d, mode)?;
-        Ok(d.app.clone())
-    })
-    .await
-}
-#[tauri::command]
-async fn select_display(
-    window: WebviewWindow,
-    app: tauri::AppHandle,
-    display_id: String,
-) -> Result<AppState, String> {
-    native_command(app.clone(), "select_display", move || {
-        authorized(&window)?;
-        let s = lock(&app);
-        let mut d = s.0.lock().map_err(|e| e.to_string())?;
-        if !connected(&d, &display_id) {
-            return Err("연결되지 않은 화면입니다.".into());
-        }
-        let mode = d.app.mode;
-        if d.app.cursor_enabled {
-            ensure_overlay(&app, &d, &display_id)?
-                .show()
-                .map_err(|e| e.to_string())?;
-        }
-        d.app.active_display_id = Some(display_id);
         change_mode(&app, &mut d, mode)?;
         Ok(d.app.clone())
     })
@@ -811,7 +801,7 @@ async fn apply_edit(
         let s = lock(&app);
         let mut d = s.0.lock().map_err(|e| e.to_string())?;
         // A pointer-up or text commit may already be in flight when native mode changes.
-        // Physical input gates enforce selection; accept the owner window's final edit.
+        // Native input gates cover connected displays; accept the owner window's final edit.
         if window.label() != label(&edit.display_id) || !connected(&d, &edit.display_id) {
             return Err("해당 화면의 필기 창에서만 편집할 수 있습니다.".into());
         }
@@ -842,9 +832,11 @@ async fn clear_current(window: WebviewWindow, app: tauri::AppHandle) -> Result<(
         let mut data = state.0.lock().map_err(|e| e.to_string())?;
         let id = data
             .app
-            .active_display_id
-            .clone()
-            .ok_or("연결된 화면이 없습니다.")?;
+            .displays
+            .iter()
+            .find(|d| d.connected && label(&d.id) == window.label())
+            .map(|d| d.id.clone())
+            .ok_or("지우려는 화면의 필기 도구에서 실행해 주세요.")?;
         clear_scope(&app, &mut data, Some(id))
     })
     .await
@@ -982,7 +974,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
     let clear_current_item = MenuItem::with_id(
         app,
         "clear-current",
-        text("선택한 화면 필기 지우기"),
+        text("커서가 있는 화면 필기 지우기"),
         true,
         None::<&str>,
     )?;
@@ -1057,7 +1049,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
                             let _ = toggle_visibility(app, &mut d);
                         }
                         "clear-current" => {
-                            if let Some(id) = d.app.active_display_id.clone() {
+                            if let Some(id) = display_under_cursor(app, &d) {
                                 let _ = clear_scope(app, &mut d, Some(id));
                             }
                         }
@@ -1162,8 +1154,11 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             get_state,
+            toolbar::get_toolbar,
+            toolbar::begin_toolbar_drag,
+            toolbar::move_toolbar,
+            toolbar::update_toolbar,
             set_mode,
-            select_display,
             update_settings,
             update_brush,
             update_preset,
@@ -1215,7 +1210,6 @@ pub fn run() {
                     cursor_enabled: false,
                     annotations_visible: true,
                     mode: Mode::Interact,
-                    active_display_id: None,
                     displays: vec![],
                     settings: loaded.clone(),
                     brush: BrushSettings::from_defaults(&loaded),
@@ -1224,6 +1218,7 @@ pub fn run() {
                 },
                 scenes: SceneStore::default(),
                 cursor: cursor::Stream::default(),
+                toolbar: toolbar::Toolbar::new(loaded.toolbar.clone()),
                 previous_focus: Default::default(),
                 settings_path: path,
                 registered: vec![],

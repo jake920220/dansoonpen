@@ -6,6 +6,7 @@
   import { CanvasRenderer } from '../canvas/renderer';
   import { appendStrokePoint, hitTestAnnotationsAlongSegment, textAtPoint, textLineBounds, FONT_FAMILY, TEXT_LINE_HEIGHT } from '../canvas/geometry';
   import { DEFAULT_SETTINGS, TOOL_LABELS, defaultBrush, type ArrowAnnotation, type BrushSettings, type Annotation, type AppSettings, type AppState, type Point, type SceneSnapshot, type SceneUpdate, type StrokeAnnotation, type TextAnnotation, type Tool } from '../shared/types';
+  import { canDrawOn } from '../shared/displays';
   import Icon from './Icon.svelte';
   import ToolbarFrame from './ToolbarFrame.svelte';
   import CursorHighlight from './CursorHighlight.svelte';
@@ -49,13 +50,27 @@
   let presetSlot = $state(0);
   let presetStatus = $state('');
   let textCommit: Promise<void> | null = null;
-  let drawing = $derived(appState?.mode === 'draw' && appState?.activeDisplayId === displayId);
+  let drawing = $derived(canDrawOn(appState, displayId));
   let settings = $derived({ ...(appState?.settings ?? DEFAULT_SETTINGS), ...optimisticSettings });
   let brush = $derived({ ...(appState?.brush ?? defaultBrush(DEFAULT_SETTINGS)), ...optimisticBrush });
   let tool = $derived(brush.tool);
   let editingBrush = $derived(textEntry ? { ...brush, color: textEntry.color, textSize: textEntry.fontSize } : brush);
   let activeWidth = $derived(tool === 'highlighter' ? brush.highlighterWidth : tool === 'eraser' ? brush.eraserSize : localWidth);
   let currentDisplay = $derived(appState?.displays.find((d) => d.id === displayId));
+
+  function clearOverlaySelection() { window.getSelection()?.removeAllRanges(); }
+  function editableSelectionTarget(target: EventTarget | null) {
+    return target instanceof Element && Boolean(target.closest('textarea, input'));
+  }
+  function preventOverlaySelection(event: Event) {
+    if (editableSelectionTarget(event.target)) return;
+    event.preventDefault();
+    clearOverlaySelection();
+  }
+  function preventOverlayDrag(event: DragEvent) {
+    event.preventDefault();
+    clearOverlaySelection();
+  }
 
   function visibleAnnotations(): Annotation[] {
     const ids = new Set(scene.annotations.map((a) => a.id));
@@ -101,8 +116,8 @@
   }
   function acceptState(next: AppState) {
     if (appState && next.revision < appState.revision) return;
-    const changedMode = !appState || appState.mode !== next.mode || appState.activeDisplayId !== next.activeDisplayId;
-    const leaving = drawing && (next.mode !== 'draw' || next.activeDisplayId !== displayId);
+    const changedMode = !appState || appState.mode !== next.mode || drawing !== canDrawOn(next, displayId);
+    const leaving = drawing && !canDrawOn(next, displayId);
     if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
     const newEntry = appState && appState.brushGeneration !== next.brushGeneration;
     appState = next;
@@ -115,6 +130,9 @@
   function resize() { renderer?.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1); if (textEntry) placeText(textEntry); }
   onMount(() => {
     const unlisteners: (() => void)[] = [];
+    document.documentElement.classList.add('overlay-document');
+    document.addEventListener('selectstart', preventOverlaySelection, true);
+    document.addEventListener('dragstart', preventOverlayDrag, true);
     const stopMetrics = registerDiagnosticMetrics(() => ({
       mode: appState?.mode,
       revision: appState?.revision,
@@ -142,7 +160,14 @@
         if (!disposed) { acceptState(initialState); acceptScene(initialScene); reportDiagnostic('ready'); }
       } catch (e) { if (!disposed) { error = message(e); reportDiagnostic('error'); } }
     })();
-    return () => { disposed = true; stopMetrics(); stopContextDiagnostics(); unlisteners.forEach((off) => off()); void settingsWriter.flush(); void brushWriter.flush(); renderer?.dispose(); };
+    return () => {
+      disposed = true;
+      document.documentElement.classList.remove('overlay-document');
+      document.removeEventListener('selectstart', preventOverlaySelection, true);
+      document.removeEventListener('dragstart', preventOverlayDrag, true);
+      stopMetrics(); stopContextDiagnostics(); unlisteners.forEach((off) => off());
+      void settingsWriter.flush(); void brushWriter.flush(); renderer?.dispose();
+    };
   });
   function submit(added: Annotation[], removedIds: string[]) {
     if (!added.length && !removedIds.length) return;
@@ -180,6 +205,7 @@
   }
   function down(event: PointerEvent) {
     if (!drawing || scene.revision < 0 || event.button !== 0 || activePointer !== null) return;
+    canvas.focus({ preventScroll: true });
     error = ''; showPalette = false;
     const start = point(event);
     if (tool === 'text') {
@@ -265,6 +291,7 @@
   }
   function startTextMove(event: PointerEvent) {
     if (event.button !== 0 || !textEntry || textDrag) return;
+    clearOverlaySelection();
     textDrag = { pointer: event.pointerId, start: point(event), origin: { x: textEntry.x, y: textEntry.y }, entry: textEntry };
     (event.currentTarget as HTMLElement).focus({ preventScroll: true });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -379,15 +406,15 @@
   }
 </script>
 
-<svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); hideEraser(); }} />
+<svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); void commitText(); clearOverlaySelection(); hideEraser(); }} />
 {#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>{$t("이곳에 설명을 그려 보세요.")}</h1><p>{$t("브라우저에서는 그리기 도구만 미리 볼 수 있습니다.")}</p><div class="preview-note">{$t("화면 위의 표시를 유지한 채")}<br /><strong>{$t("다음 이야기로 넘어가세요.")}</strong></div></div>{/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label={$t("화면 필기 캔버스")} tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
 <div bind:this={eraserCursor} class="eraser-cursor" style:width={`${brush.eraserSize}px`} style:height={`${brush.eraserSize}px`}></div>
 
-{#if appState?.cursorEnabled && appState.activeDisplayId === displayId}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
+{#if appState?.cursorEnabled && currentDisplay?.connected}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
 
-{#if appState?.activeDisplayId === displayId}
+{#if appState && currentDisplay?.connected}
   <FeedbackNotice feedback={appState.feedback} undoToken={appState.clearUndoToken} interactive={drawing || !native} reduceMotion={settings.reduceMotion} onundo={(token) => action(() => bridge.undoClear(token))} />
 {/if}
 {#if drawing}
@@ -418,7 +445,6 @@
       </div>
       {#if appState?.clearUndoToken != null}<button class="clear-undo" aria-label={$t("방금 지운 필기 되돌리기")} onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={17} />{$t("삭제 복구")}</button>{/if}
       <span class="toolbar-divider"></span>
-      {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label={$t("그릴 화면")} value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{$t(d.name)}</option>{/each}</select>{/if}
       {#if detailed || appState?.cursorEnabled}<button aria-label={$t("커서 강조")} aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title={$t("커서 강조 켜기/끄기 (C)")} onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>{/if}
       {#if detailed}<button aria-label={$t("필기 잠시 숨기기")} title={$t("필기 잠시 숨기기 ({0})", [shortcutLabel(settings.visibilityShortcut)])} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>{/if}
       {#if detailed}<button aria-label={$t("설정 열기")} title={$t("설정 열기 ({0})", [shortcutLabel(settingsShortcut)])} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>{/if}

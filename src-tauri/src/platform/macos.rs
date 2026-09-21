@@ -1,7 +1,7 @@
-use objc2::rc::Retained;
+use objc2::{rc::Retained, MainThreadMarker};
 use objc2_app_kit::{
-    NSApplicationActivationOptions, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
-    NSWorkspace,
+    NSApplication, NSApplicationActivationOptions, NSRunningApplication, NSWindow,
+    NSWindowCollectionBehavior, NSWorkspace,
 };
 use tauri::WebviewWindow;
 #[derive(Clone, Default)]
@@ -40,6 +40,72 @@ pub fn configure_overlay(window: &WebviewWindow) -> Result<(), String> {
     );
     ns.setLevel(25); // Above full-screen presentation windows, below system menus/security UI.
     ns.setHidesOnDeactivate(false);
+    Ok(())
+}
+
+fn display_frame(display: &crate::model::DisplayInfo, desktop_top: f64) -> [f64; 4] {
+    let scale = display.scale_factor;
+    let width = f64::from(display.width) / scale;
+    let height = f64::from(display.height) / scale;
+    [
+        f64::from(display.x) / scale,
+        desktop_top - f64::from(display.y) / scale - height,
+        width,
+        height,
+    ]
+}
+
+pub fn place_overlay(
+    window: &WebviewWindow,
+    display: &crate::model::DisplayInfo,
+    desktop_top: f64,
+) -> Result<(), String> {
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    // Main thread only. Convert using the destination display, never the window's old scale.
+    // Set the complete AppKit frame synchronously before enabling input or reading the cursor.
+    let ns = unsafe { &*raw.cast::<NSWindow>() };
+    let [x, y, width, height] = display_frame(display, desktop_top);
+    let mut frame = ns.frame();
+    frame.origin.x = x;
+    frame.origin.y = y;
+    frame.size.width = width;
+    frame.size.height = height;
+    ns.setFrame_display(frame, true);
+    Ok(())
+}
+
+pub fn show_overlay(window: &WebviewWindow) -> Result<(), String> {
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    // Showing every display must not activate each window or steal keyboard focus.
+    unsafe { &*raw.cast::<NSWindow>() }.orderFrontRegardless();
+    Ok(())
+}
+
+pub fn set_overlay_input(window: &WebviewWindow, enabled: bool) -> Result<(), String> {
+    window.set_focusable(enabled).map_err(|e| e.to_string())?;
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    let ns = unsafe { &*raw.cast::<NSWindow>() };
+    ns.setIgnoresMouseEvents(!enabled);
+    if !enabled && ns.isKeyWindow() {
+        ns.resignKeyWindow();
+    }
+    Ok(())
+}
+
+#[allow(deprecated)]
+pub fn focus_overlay(window: &WebviewWindow) -> Result<(), String> {
+    let raw = window.ns_window().map_err(|e| e.to_string())?;
+    let ns = unsafe { &*raw.cast::<NSWindow>() };
+    let main =
+        MainThreadMarker::new().ok_or("필기 창 활성화는 메인 스레드에서 실행해야 합니다.")?;
+    // NSRunningApplication only sends an asynchronous activation request. Use the
+    // application's own activation path, then select the key window and webview.
+    NSApplication::sharedApplication(main).activateIgnoringOtherApps(true);
+    ns.makeKeyAndOrderFront(None);
+    let webview: &tauri::Webview = window.as_ref();
+    webview.set_focus().map_err(|e| e.to_string())?;
+    // AppKit may finish activation after this callback. An immediate isKeyWindow
+    // check must not undo the user's draw request before that event is processed.
     Ok(())
 }
 pub fn window_diagnostics(window: &WebviewWindow) -> Result<serde_json::Value, String> {
@@ -134,4 +200,62 @@ pub fn cursor_reading(
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGEventSourceCounterForEventType(state: i32, event: u32) -> u32;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn display(
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+    ) -> crate::model::DisplayInfo {
+        crate::model::DisplayInfo {
+            id: "test".into(),
+            name: "test".into(),
+            x,
+            y,
+            width,
+            height,
+            scale_factor,
+            is_primary: false,
+            connected: true,
+        }
+    }
+
+    #[test]
+    fn wake_incident_retina_frame_uses_destination_scale() {
+        // Actual September 15 layout: 1x external primary, 2x Retina to its right.
+        assert_eq!(
+            display_frame(&display(5120, 968, 2940, 1912, 2.), 1440.),
+            [2560., 0., 1470., 956.]
+        );
+        assert_eq!(
+            display_frame(&display(0, 0, 2560, 1440, 1.), 1440.),
+            [0., 0., 2560., 1440.]
+        );
+    }
+
+    #[test]
+    fn layouts_left_above_and_below_primary_keep_their_origins() {
+        assert_eq!(
+            display_frame(&display(-2940, 0, 2940, 1912, 2.), 1440.),
+            [-1470., 484., 1470., 956.]
+        );
+        assert_eq!(
+            display_frame(&display(0, -1912, 2940, 1912, 2.), 1440.),
+            [0., 1440., 1470., 956.]
+        );
+        assert_eq!(
+            display_frame(&display(0, 2880, 2940, 1912, 2.), 1440.),
+            [0., -956., 1470., 956.]
+        );
+        assert_eq!(
+            display_frame(&display(0, 0, 2940, 1912, 2.), 956.),
+            [0., 0., 1470., 956.]
+        );
+    }
 }

@@ -114,6 +114,33 @@ pub fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn toolbar_preferences_survive_other_settings_edits_and_restart() {
+        use crate::model::SettingsPatch;
+        let path =
+            std::env::temp_dir().join(format!("my-brush-toolbar-{}.json", std::process::id()));
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        legacy.as_object_mut().unwrap().remove("toolbar");
+        std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        let mut settings = load(&path).unwrap();
+        assert_eq!(settings.toolbar, crate::toolbar::Preferences::default());
+        settings.toolbar = crate::toolbar::Preferences {
+            display_id: Some("main".into()),
+            x: 0.2,
+            y: 0.8,
+            collapsed: true,
+            detailed: true,
+        };
+        let changed = SettingsPatch {
+            width: Some(9.),
+            ..Default::default()
+        }
+        .apply(&settings);
+        assert_eq!(changed.toolbar, settings.toolbar);
+        save(&path, &changed).unwrap();
+        assert_eq!(load(&path).unwrap(), changed);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn legacy_eraser_size_is_independent_and_custom_values_round_trip() {
         use crate::model::{BrushPatch, BrushSettings};
         let path =
@@ -174,6 +201,9 @@ mod tests {
             ..AppSettings::default()
         };
         old.presets[0].name = "내 강의".into();
+        old.toolbar.display_id = Some("lecture-display".into());
+        old.toolbar.x = 0.8;
+        old.toolbar.collapsed = true;
         let mut json = serde_json::to_value(&old).unwrap();
         json["version"] = 5.into();
         json.as_object_mut().unwrap().remove("language");
@@ -190,6 +220,8 @@ mod tests {
         let english = patch.apply(&loaded);
         assert_eq!(english.width, 19.);
         assert_eq!(english.presets, loaded.presets);
+        assert_eq!(loaded.toolbar, old.toolbar);
+        assert_eq!(english.toolbar, old.toolbar);
         assert_eq!(english.toggle_shortcut, loaded.toggle_shortcut);
         save(&path, &english).unwrap();
         assert_eq!(load(&path).unwrap(), english);
