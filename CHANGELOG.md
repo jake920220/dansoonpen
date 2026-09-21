@@ -4,7 +4,7 @@
 
 - Added a Windows x64 NSIS test installer, automated Windows checks, and a real-device test checklist.
 - Fixed Windows diagnostic log writes failing with access denied: the log lock handle now includes read access, as required for Windows file locking. Existing rotation and persistence tests cover the failure.
-- Windows drawing, Korean IME, display scaling, and screen-sharing still await real-device feedback.
+- Windows installation, launch, and basic use passed user testing. Detailed Korean IME, mixed-DPI, screen-sharing, and extended-session checks remain open.
 - [Downloads and release notes](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1).
 
 ## 0.7.0 — 2026-09-21 (Pre-release)

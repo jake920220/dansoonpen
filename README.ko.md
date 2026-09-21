@@ -4,16 +4,21 @@
   <p><strong>화면 위에 그리고, 설명이 끝날 때까지 남겨 두세요.</strong></p>
   <p>강의·라이브 코딩·발표를 위한 화면 필기 도구.</p>
   <p><a href="README.md">English</a> · <strong>한국어</strong></p>
-  <p><a href="#시작하기">시작하기</a> · <a href="#단축키">단축키</a> · <a href="#사용법">사용법</a> · <a href="CONTRIBUTING.ko.md">기여하기</a></p>
+  <p><a href="#다운로드">다운로드</a> · <a href="#시작하기">시작하기</a> · <a href="#단축키">단축키</a> · <a href="#사용법">사용법</a> · <a href="CONTRIBUTING.ko.md">기여하기</a></p>
 </div>
 
 DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사용 중인 앱 위에 필기를 남기는 도구입니다. 직접 지우기 전까지 표시가 유지되며, 뒤쪽 앱을 조작할 때도 필기가 남습니다. 지운 뒤에는 같은 도구로 바로 이어서 그릴 수 있습니다.
 
 **Tauri·Rust·Svelte·Canvas**로 만들었습니다. 계정·서버·사용 통계 업로드 없이 로컬에서 작동합니다.
 
-> **[macOS Apple Silicon용 v0.7.1 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip)** · [릴리스 안내·체크섬](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)
->
-> 프리릴리스 · macOS 13 이상 · Apple Silicon(M 시리즈). [Windows x64 테스트 설치 파일](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe)도 제공합니다. Windows 실기 검증은 대기 중이며 Intel Mac 빌드는 없습니다.
+## 다운로드
+
+| 플랫폼 | 요구 사항 | 설치 파일 |
+| --- | --- | --- |
+| macOS | macOS 13 이상 · Apple Silicon(M 시리즈) | [macOS 다운로드 (.zip)](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip) |
+| Windows | Windows 10/11 · Intel/AMD x64 | [Windows 다운로드 (.exe)](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) |
+
+**v0.7.1 프리릴리스** · [릴리스 안내·체크섬](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1). 두 플랫폼 모두 설치·실행 및 기본 사용을 확인했습니다. Intel Mac·Windows ARM 네이티브 빌드는 제공하지 않습니다.
 
 ## 주요 기능
 
@@ -41,9 +46,11 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 | 여러 화면·언어로 강의할 때 | 앱에서 한국어·영어를 전환하고 하나의 공용 도구막대를 모니터 사이로 옮깁니다. |
 | 도구를 직접 살펴보고 개선할 때 | 계정·구독 없이 사용하며 Apache-2.0 소스를 공개합니다. Tauri/Rust와 OS WebView로 구현했습니다. |
 
-다른 도구에도 겹치는 기능이 있습니다. [DrawPen](https://github.com/DmytroVasin/DrawPen)은 여러 필기 도구와 macOS·Windows·Linux 지원을 제공하고, [gInk](https://github.com/geovens/gInk)도 오픈소스 화면 필기 도구입니다. 단순펜은 위 동작의 조합과 강의 흐름에 집중합니다. 현재 설치 파일 검증 대상은 Apple Silicon Mac이며, 다른 도구와의 메모리·속도 비교 측정은 아직 하지 않았습니다.
+다른 도구에도 겹치는 기능이 있습니다. [DrawPen](https://github.com/DmytroVasin/DrawPen)은 여러 필기 도구와 macOS·Windows·Linux 지원을 제공하고, [gInk](https://github.com/geovens/gInk)도 오픈소스 화면 필기 도구입니다. 단순펜은 위 동작의 조합과 강의 흐름에 집중합니다. Apple Silicon Mac과 Windows x64에서 기본 사용을 확인했습니다. 다른 도구와의 메모리·속도 비교 측정은 아직 하지 않았습니다.
 
 ## 시작하기
+
+아래 설치 파일은 개발 도구 없이 실행할 수 있습니다. Node.js·Rust는 소스에서 직접 빌드할 때만 필요합니다. GitHub의 **Source code** 압축 파일은 설치용 앱이 아닙니다.
 
 ### 다운로드·설치 — macOS
 
@@ -51,19 +58,19 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 2. 압축을 풀고 **DansoonPen.app**을 **응용 프로그램** 폴더로 옮기세요. 기존 앱을 교체한다면 실행 중인 이전 버전을 먼저 종료하세요.
 3. 앱을 열고 **Option+Z**로 필기를 시작하세요.
 
-ZIP에는 바로 실행할 수 있는 앱이 들어 있습니다. Node.js·Rust는 소스에서 직접 빌드할 때만 필요합니다. GitHub의 **Source code** 압축 파일은 설치용 앱이 아닙니다.
-
 **서명 안내:** 이번 프리릴리스는 ad-hoc 서명만 적용했고 Apple Developer ID 서명·공증은 받지 않았습니다. 첫 실행이 차단될 수 있습니다. 이 저장소에서 직접 받은 신뢰할 수 있는 앱인지 확인한 후 [Apple의 미공증 앱 실행 안내](https://support.apple.com/ko-kr/102445)를 참고하세요. Gatekeeper 전체를 끄지 마세요.
 
 [SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS.txt)와 알려진 한계는 [릴리스 페이지](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)에서도 확인할 수 있습니다. Intel Mac 설치 파일은 아직 제공하지 않습니다.
 
-### Windows x64 테스트 설치 파일
+### 다운로드·설치 — Windows
 
-Windows 10/11의 일반 Intel/AMD x64 PC에서는 [Windows 설치 파일](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe)을 실행한 뒤 시작 메뉴에서 DansoonPen을 여세요. 개발 도구는 필요하지 않습니다. WebView2가 없으면 설치 과정에서 다운로드하므로 인터넷 연결이 필요할 수 있습니다.
+1. [Windows x64 설치 파일을 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe)하세요. Windows 10/11의 일반 Intel/AMD x64 PC용입니다.
+2. 실행 중인 이전 버전을 종료하고 **설치 프로그램(.exe)**을 실행하세요.
+3. 시작 메뉴에서 DansoonPen을 열고 **Alt+Shift+Z**로 필기를 시작하세요. **Alt+Shift+X**는 전체 삭제입니다.
 
-**코드 서명 없는 테스트 배포본**이므로 SmartScreen 또는 알 수 없는 게시자 안내가 나타날 수 있습니다. 출처와 [Windows 체크섬](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt)을 확인하세요. 자동 빌드·설치 검사는 실제 PC의 필기·한글 입력·화면공유 검증과 다릅니다. Windows ARM 네이티브 빌드는 포함하지 않습니다.
+WebView2가 없으면 설치 과정에서 다운로드하므로 인터넷 연결이 필요할 수 있습니다.
 
-**Alt+Shift+Z**로 그리기 전환, **Alt+Shift+X**로 전체 삭제를 사용하세요. [Windows 테스트 체크리스트](docs/testing/windows-v0.7.1.md)에 따라 결과를 알려주시면 개선에 도움이 됩니다.
+**서명 안내:** 이번 프리릴리스에는 코드 서명이 없어 SmartScreen 또는 알 수 없는 게시자 안내가 나타날 수 있습니다. 출처와 [Windows 체크섬](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt)을 확인하세요.
 
 ### 소스에서 실행
 
@@ -141,19 +148,20 @@ Windows 기본 단축키는 **Alt+Shift+Z**, **Alt+Shift+X**이며 설정에서 
 
 | 플랫폼 | 현재 상태 |
 | --- | --- |
-| macOS Apple Silicon | 로컬 빌드와 일부 실제 앱 동작 검증, 배포 검증 진행 중 |
+| macOS Apple Silicon | 설치·실행 및 기본 사용 확인 |
 | macOS Intel | 미검증 |
-| Windows x64 | 테스트 설치 파일 제공, 실제 PC 필기·화면공유 검증 대기 |
+| Windows x64 | 설치·실행 및 기본 사용 테스트 통과 — 사용자 PC에서 확인 |
 | Linux | 이 프로젝트의 지원 대상 아님 |
 
 - **필기는 임시 데이터입니다.** 메모리에만 보관하며 앱을 종료하면 사라집니다. 세션 저장·이미지 내보내기는 아직 없습니다. 설정창 닫기는 숨기기이며, **앱 종료**는 완전 종료입니다.
 - 그림은 화면 좌표에 고정되어 스크롤이나 슬라이드를 따라가지 않습니다. 지우개는 픽셀 일부가 아닌 객체 전체를 지웁니다.
+- 두 플랫폼의 기본 사용 확인은 모든 환경의 검증을 의미하지 않습니다. Windows 기본 사용 결과와 추가 검사 범위는 [검증 기록](docs/testing/windows-release-2026-09-21.md)에 정리했습니다.
 - 입력·포커스 복구와 회색 오버레이 관련 수정이 포함되어 있습니다. 장시간 강의·잠자기 복귀·혼합 배율·화면공유 수신 환경은 추가 확인이 필요합니다. [검증 기록](docs/testing/verification.md)을 참고하세요.
 - 설정과 용량이 제한된 진단 로그는 로컬에 저장합니다. 로그에 필기 내용·화면 이미지를 수집하지 않습니다. 공유 전 내용을 확인하세요. [진단 로그 안내](docs/testing/diagnostics.md)
 
 ## 기여하기
 
-재현 가능한 오류 제보, Windows 실기 테스트, 번역 개선을 환영합니다. OS·앱 버전, 모니터 배치·배율, 재현 순서, 기대한 동작을 함께 알려 주세요. 스크린샷·로그에서 비공개 강의 자료는 제거해 주세요.
+재현 가능한 오류 제보, 다양한 환경의 실기 테스트, 번역 개선을 환영합니다. OS·앱 버전, 모니터 배치·배율, 재현 순서, 기대한 동작을 함께 알려 주세요. 스크린샷·로그에서 비공개 강의 자료는 제거해 주세요.
 
 [기여 안내](CONTRIBUTING.ko.md)를 참고하세요. 영문 번역은 [`src/locales/en.json`](src/locales/en.json)에 있으며 `{0}` 같은 치환자는 유지해야 합니다.
 

@@ -4,16 +4,21 @@
   <p><strong>Draw on your screen. Keep your explanation visible.</strong></p>
   <p>A desktop annotation tool for teaching, live coding, and presentations.</p>
   <p><strong>English</strong> · <a href="README.ko.md">한국어</a></p>
-  <p><a href="#get-started">Get started</a> · <a href="#shortcuts">Shortcuts</a> · <a href="#using-dansoonpen">Usage</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
+  <p><a href="#download">Download</a> · <a href="#get-started">Get started</a> · <a href="#shortcuts">Shortcuts</a> · <a href="#using-dansoonpen">Usage</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 </div>
 
 DansoonPen lets you mark up slides, code, or any app without switching to a whiteboard. Annotations stay until you clear them—even while you interact with the apps underneath. Clear the screen and keep drawing with the same tool.
 
 Built with **Tauri, Rust, Svelte, and Canvas**. Works locally, without an account, a server, or analytics uploads.
 
-> **[Download v0.7.1 for macOS Apple Silicon](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip)** · [Release notes & checksums](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)
->
-> Pre-release · macOS 13+ · Apple Silicon (M-series). [Windows x64 test installer](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) is also available; real-device validation is pending. Intel Mac builds are not available.
+## Download
+
+| Platform | Requirements | Installer |
+| --- | --- | --- |
+| macOS | macOS 13+ · Apple Silicon (M-series) | [Download for macOS (.zip)](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip) |
+| Windows | Windows 10/11 · Intel/AMD x64 | [Download for Windows (.exe)](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) |
+
+**v0.7.1 pre-release** · [Release notes & checksums](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1). Installation, launch, and basic use have been checked on both platforms. Intel Mac and native Windows ARM builds are not available.
 
 ## Why DansoonPen?
 
@@ -41,9 +46,11 @@ DansoonPen grew out of teaching with a screen brush: explanations often last lon
 | Work across languages and displays | Switch Korean/English in the app and move one shared toolbar between monitors. |
 | Inspect or adapt the tool | Apache-2.0 source, no account or subscription, and a Tauri/Rust implementation using the OS WebView. |
 
-Other tools also provide overlapping features: [DrawPen](https://github.com/DmytroVasin/DrawPen) offers multiple annotation tools and macOS/Windows/Linux support, and [gInk](https://github.com/geovens/gInk) is another open-source annotation tool. DansoonPen's emphasis is the combination above, with current binary validation limited to Apple Silicon Macs. No comparative memory or speed benchmark has been completed.
+Other tools also provide overlapping features: [DrawPen](https://github.com/DmytroVasin/DrawPen) offers multiple annotation tools and macOS/Windows/Linux support, and [gInk](https://github.com/geovens/gInk) is another open-source annotation tool. DansoonPen's emphasis is the combination above. Basic use has been checked on Apple Silicon Macs and Windows x64 PCs. No comparative memory or speed benchmark has been completed.
 
 ## Get started
+
+These downloads run without development tools. Node.js and Rust are only needed for building from source. The **Source code** archives on GitHub are not the app download.
 
 ### Download and install — macOS
 
@@ -51,19 +58,19 @@ Other tools also provide overlapping features: [DrawPen](https://github.com/Dmyt
 2. Unzip it and drag **DansoonPen.app** into **Applications**. Quit an older running copy before replacing it.
 3. Open DansoonPen and start drawing with **Option+Z**.
 
-The ZIP contains the ready-to-run app; Node.js and Rust are only needed for building from source. The **Source code** archives on GitHub are not the app download.
-
 **Signing:** this pre-release is ad-hoc signed, without an Apple Developer ID signature or notarization. macOS may block the first launch. For an app you downloaded from this repository and trust, follow [Apple's guidance for opening an unnotarized app](https://support.apple.com/en-us/102445). Do not disable Gatekeeper globally.
 
 [SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS.txt) and known limitations are included on the [release page](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1). Intel Mac installers are not published for this version.
 
-### Windows x64 test installer
+### Download and install — Windows
 
-[Download the Windows installer](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) for Windows 10/11 on Intel/AMD x64 PCs. Run the installer, then launch DansoonPen from the Start menu. Development tools are not required; if WebView2 is missing, setup may download it and require internet access.
+1. [Download the Windows x64 installer](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) for Windows 10/11 on Intel/AMD x64 PCs.
+2. Quit an older running copy and run the **installer (.exe)**.
+3. Launch DansoonPen from the Start menu and press **Alt+Shift+Z** to draw. **Alt+Shift+X** clears annotations.
 
-This is an **unsigned test build**, so SmartScreen or an unknown-publisher warning may appear. Verify the source and [Windows checksum](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt). The automated Windows build and installation checks do not establish real-device drawing, IME, or screen-sharing support. Windows ARM native builds are not included.
+If WebView2 is missing, setup may download it and require internet access.
 
-Start with **Alt+Shift+Z** to draw and **Alt+Shift+X** to clear. Please report your results using the [Windows test checklist (Korean)](docs/testing/windows-v0.7.1.md).
+**Signing:** this pre-release is unsigned, so SmartScreen or an unknown-publisher warning may appear. Verify the source and [Windows checksum](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt).
 
 ### Install from source
 
@@ -141,19 +148,20 @@ Open **Settings → Language / 언어** and choose **English** or **한국어**.
 
 | Platform | Current status |
 | --- | --- |
-| macOS Apple Silicon | Local builds and selected native workflows tested; broader release validation ongoing |
+| macOS Apple Silicon | Installation, launch, and basic use checked |
 | macOS Intel | Not verified |
-| Windows x64 | Test installer available; real-device drawing and screen-sharing validation pending |
+| Windows x64 | Installation, launch, and basic-use testing passed on a user PC |
 | Linux | Not supported by this project |
 
 - **Annotations are temporary.** They live in memory and disappear when the app quits. Session saving and image export are not implemented. Closing the settings window hides it; **Quit app** exits.
 - Annotations stay at screen coordinates; they do not follow scrolling content or slide changes. The eraser removes whole objects, not individual pixels.
+- Basic-use checks on both platforms do not establish compatibility with every environment. See the [Windows verification record](docs/testing/windows-release-2026-09-21.md) for the user report and remaining detailed checks.
 - Input/focus recovery and gray-overlay fixes are included. Long teaching sessions, sleep/wake, mixed-DPI layouts, and screen-sharing receivers still need broader verification. See the [test records](docs/testing/verification.md); most engineering notes are in Korean.
 - Settings and bounded diagnostic logs stay on your computer. Diagnostics exclude annotation text and screen images. Review logs before sharing them. See [diagnostics](docs/testing/diagnostics.md).
 
 ## Contribute
 
-Reproducible bug reports, Windows testing, and translation improvements are especially helpful. Include your OS/app version, monitor arrangement and scaling, steps to reproduce, and expected behavior. Remove private lecture material from screenshots and logs.
+Reproducible bug reports, testing across different environments, and translation improvements are especially helpful. Include your OS/app version, monitor arrangement and scaling, steps to reproduce, and expected behavior. Remove private lecture material from screenshots and logs.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). English translations live in [`src/locales/en.json`](src/locales/en.json); keep placeholders such as `{0}` unchanged.
 
