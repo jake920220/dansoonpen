@@ -15,10 +15,37 @@
 
 ## 검증
 
-README의 check·test·clippy를 실행하세요. 오버레이/입력 변경은 실제 앱에서도 확인해야 합니다. 브라우저 통과를 macOS 또는 Windows 실기 통과로 기록하지 않습니다. 회의 화면은 송신자뿐 아니라 수신 기기에서 확인합니다.
+아래 검사를 실행하세요. 오버레이/입력 변경은 실제 앱에서도 확인해야 합니다. 브라우저 통과를 macOS 또는 Windows 실기 통과로 기록하지 않습니다. 회의 화면은 송신자뿐 아니라 수신 기기에서 확인합니다.
 
 의존성 변경 후 `node scripts/generate-notices.mjs`로 고지를 갱신하고 `node scripts/generate-notices.mjs --check`로 일치 여부를 확인합니다. 공급된 의존성 코드를 직접 수정했다면 해당 라이선스의 소스 제공·변경 표시 의무를 별도로 반영하세요.
 
 ## 번역
 
 한국어 원문을 기본으로 `src/locales/en.json`에 영어 번역을 둡니다. `{0}` 등의 자리표시자와 접근성 라벨을 유지하세요. 필기와 사용자 프리셋 이름은 번역하지 않습니다. 언어만 바꿀 때 모드·도구·단축키가 보존되는지 검사하고, 그리기 기본값 복원으로 언어를 초기화하지 않습니다.
+
+## 검사와 패키징 명령
+
+```sh
+npm run check
+npm test
+cargo fmt --check --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+node scripts/generate-notices.mjs --check
+```
+
+`npm run dev`는 개발용 브라우저 미리보기입니다. 실제 앱은 `npm run tauri dev`로 실행합니다. 설치 파일은 해당 OS에서 만드세요.
+
+```sh
+# 의존성 원문을 확보한 뒤 배포 고지 생성
+cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+node scripts/generate-notices.mjs
+
+# macOS: 빌드와 로컬 ad-hoc 서명 ZIP 포장 (artifacts/)
+bash scripts/package-macos.sh
+
+# Windows: Windows에서 NSIS 설치 프로그램 생성
+npm run tauri build -- --bundles nsis
+```
+
+`artifacts/`와 사용자 설정·로그는 Git에 올리지 않습니다. Windows 빌드 성공은 실기 검증이 아닙니다. macOS 공개 바이너리는 서명·공증·새 기기 설치 과정을 별도로 확인해야 합니다. 첫 저장소 생성과 릴리스 순서는 [공개 준비 안내](docs/release/repository-setup.ko.md)를 따릅니다.

@@ -1,127 +1,125 @@
-# My Brush
+<div align="center">
+  <img src="src-tauri/icons/icon.png" width="80" alt="DansoonPen icon" />
+  <h1>DansoonPen</h1>
+  <p><strong>Draw on your screen. Keep your explanation visible.</strong></p>
+  <p>A desktop annotation tool for teaching, live coding, and presentations.</p>
+  <p><strong>English</strong> · <a href="README.ko.md">한국어</a></p>
+  <p><a href="#get-started">Get started</a> · <a href="#shortcuts">Shortcuts</a> · <a href="#using-dansoonpen">Usage</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
+</div>
 
-**English** | [한국어](README.ko.md)
+DansoonPen lets you mark up slides, code, or any app without switching to a whiteboard. Annotations stay until you clear them—even while you interact with the apps underneath. Clear the screen and keep drawing with the same tool.
 
-Draw on your screen while teaching, presenting or explaining code. Your annotations stay until you clear them. Switch back to your apps without losing your notes.
+Built with **Tauri, Rust, Svelte, and Canvas**. Works locally, without an account, a server, or analytics uploads.
 
-My Brush is an independently built, open-source desktop app using Tauri, Rust and Svelte. No account, server or screen recording is required.
+> **Pre-release:** public installers are not available yet. macOS Apple Silicon is the current validation platform. Windows implementation is included, but native Windows testing is still pending.
 
-**v0.6 is in pre-release validation.** macOS Apple Silicon builds and selected native workflows have been tested. Windows support is implemented but has **not yet been validated on a Windows PC**. See [compatibility](docs/testing/compatibility.md) and [verification](docs/testing/verification.md) for the exact scope; historical testing documents are currently in Korean.
+## Why DansoonPen?
+
+- **Keep your notes visible.** No automatic fade; clearing is a deliberate action.
+- **Stay in the flow.** Clearing keeps your current tool and toolbar. Leaving drawing mode keeps your annotations.
+- **Explain with more than a pen.** Use a highlighter, arrows, editable text, an object eraser, and undo/redo.
+- **Move between displays.** Draw on any connected display and drag the shared toolbar to the one you need.
+- **Make it yours.** Adjust widths, use the color wheel, save three presets, and record your own global shortcuts.
+- **Choose your language.** Korean and English UI, including the toolbar and tray menu. Nanum Gothic is bundled for text annotations.
+
+![DansoonPen settings](docs/images/settings-en.png)
+
+*Actual macOS settings window. The 14px pen shown is a saved preference; a fresh installation defaults to 12px.*
 
 ## Get started
 
-There is no public download URL yet. Build from source using the instructions below. Once a public repository and release are available, the release should include platform-specific installers, checksums and installation instructions.
+### Install from source
 
-1. Open My Brush, select a display and choose **Start drawing**.
-2. Use **Option+Z** on macOS or **Alt+Shift+Z** on Windows to switch between drawing and interacting with your apps. Your annotations stay on screen.
-3. Use **Option+X / Alt+Shift+X**, or the trash button, to clear annotations. Your current tool and toolbar remain active.
-4. Open **설정 / Settings → 언어 / Language** to choose **English** or **한국어**. The setting is saved and applies immediately to the control window, toolbar and tray menu. Existing installations start in Korean. Your annotations and saved preset names are never translated.
-5. When sharing, choose your **entire display**. Sharing a single app window may not include the annotation overlay.
+Install [Node.js](https://nodejs.org/), [Rust](https://rustup.rs/), and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). Local validation uses Node.js 26 and Rust 1.94; the configured macOS minimum is 13.0. Windows development needs Microsoft C++ Build Tools and WebView2.
 
-Local macOS ZIPs use an ad-hoc signature. They are not Developer ID signed or notarized distribution builds. Installation on other Macs remains a release-validation task.
-
-## Features
-
-- Pen with adjustable width, quick colors and a color wheel; new-install defaults are yellow and 12px.
-- Independent eraser diameter (16–128px, default 48px), quick size choices and actual-size previews.
-- Highlighter with independent width/opacity, and arrows with Shift snapping to 45°.
-- Multiline text with bundled Nanum Gothic, default 40px. Click existing text with the text tool to edit it, move it and change its color or size.
-- Undo/redo, gentle manual clearing, and recovery of the last clear before further edits.
-- Movable, collapsible toolbar with a compact view and **More tools**. Its layout is remembered per display.
-- Three editable presets, separate saved defaults and current-tool settings.
-- Return to drawing with the saved default **pen**, regardless of the previously selected tool.
-- Hide/show annotations without deleting them, clear one display or all displays, and optional cursor/click highlights.
-- Global shortcut recording and conflict feedback. Recovery controls in the macOS menu bar / Windows tray.
-- Korean and English interface, including tooltips and accessibility labels.
-
-## Shortcuts
-
-Global bindings can be changed in Settings. The following are defaults; customized bindings take precedence.
-
-| Action | macOS | Windows |
-| --- | --- | --- |
-| Draw ↔ interact | Option+Z | Alt+Shift+Z |
-| Clear all, keep current tool | Option+X | Alt+Shift+X |
-| Hide / show annotations | Option+V | Alt+Shift+V |
-| Open settings while My Brush is active | Cmd+, | Ctrl+, |
-| Return to apps, keep annotations | Esc | Esc |
-| Undo / redo | Cmd+Z / Cmd+Shift+Z | Ctrl+Z / Ctrl+Shift+Z |
-| Pen / eraser / text | P / E / T | P / E / T |
-| Arrow / highlighter | A / H | A / H |
-| Presets 1–3 | Shift+1–3 | Shift+1–3 |
-| Quick colors / tool size | 1–6 / [ ] | 1–6 / [ ] |
-| Cursor highlight while drawing | C | C |
-
-Tool shortcuts do not intercept text input. In the text editor, Enter finishes editing, Shift+Enter inserts a line break and Esc cancels. IME composition takes priority; comprehensive native Korean IME validation is still pending.
-
-To move existing text, select **Text**, click the annotation and drag its handle. Arrow keys move the focused handle by 1px; Shift+arrow moves it by 10px. Content, position and style changes are one undoable edit. Finishing with empty text deletes that annotation.
-
-Toolbar changes affect the current tool. Settings changes update saved starting defaults and the current tool. Presets save tool, color, pen width, eraser diameter, text size and highlighter width/opacity. Use **Default pen** to restore your saved defaults.
-
-A clear cancels unfinished strokes/text, preserves newly started strokes after the clear, and leaves the current mode unchanged. **Restore last clear** is available in the toolbar, tray or control window until a later edit or undo/redo invalidates it. The notice itself is click-through while interacting with other apps.
-
-## Build from source
-
-Tools used for local validation: Node.js 26, Rust/Cargo 1.94. macOS minimum deployment target: 13.0. Windows's first manual-validation target is Windows 11 x64.
-
-Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/): Xcode Command Line Tools on macOS; Microsoft C++ Build Tools, the Rust MSVC toolchain and WebView2 on Windows.
+From the project directory:
 
 ```sh
 npm ci
 npm run tauri dev
 ```
 
-`npm run dev` starts a development-only browser preview. It cannot validate desktop transparency, global hotkeys, OS focus or click-through behavior.
+For a standalone local macOS app:
 
 ```sh
-npm run check
-npm test
-cargo fmt --check --manifest-path src-tauri/Cargo.toml
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-```
-
-Build each platform on that platform:
-
-```sh
-# Prepare dependency caches and bundled notices before packaging.
-cargo fetch --locked --manifest-path src-tauri/Cargo.toml
-node scripts/generate-notices.mjs
-
-# macOS app
 npm run tauri build -- --bundles app
-
-# macOS local ad-hoc signed ZIP
-bash scripts/package-macos.sh
-
-# Windows installer — run on Windows
-npm run tauri build -- --bundles nsis
 ```
 
-The macOS bundle is created in `src-tauri/target/release/bundle/macos/`; local ZIPs in `artifacts/`; Windows installers in `src-tauri/target/release/bundle/nsis/`. Windows testers can use `scripts/verify-windows.ps1`. A successful build does not establish native behavior or screen-sharing compatibility.
+Open `src-tauri/target/release/bundle/macos/DansoonPen.app`. Build and packaging details are in [CONTRIBUTING.md](CONTRIBUTING.md). Local macOS bundles are not Developer ID signed or notarized public releases.
 
-## Privacy, limits and known issues
+### Your first annotation
 
-- Drawings live in memory and disappear when you quit. There is no session persistence or image export yet. Closing the control window hides it; **Quit app** or the tray menu exits.
-- Settings and bounded diagnostics are stored locally. No account, analytics upload or screen recording is implemented. Logs exclude annotation text and screen images; review any log before sharing it.
-- Draw on one display at a time; annotations on other displays are preserved. One stroke cannot cross display boundaries. Annotations stay at screen coordinates rather than following a scrolling app or a slide.
-- The eraser removes entire touched strokes, arrows or text objects, not individual pixels.
-- Undo history is bounded by 128 operations and a memory budget. Dropping old history does not erase visible annotations. Scene data has a 64MiB limit; one stroke has a 100,000-point limit and text has a 10,000 UTF-16-unit limit. Large clears may skip part of the animation to bound temporary memory.
-- Intermittent hotkey failures and a reported gray overlay are under investigation. Their root cause and full resolution have not been established. If they recur, record the time, OS, display arrangement and exact steps; see [diagnostics](docs/testing/diagnostics.md).
-- Windows native behavior, screen-sharing receiver output, projectors, mixed-DPI precision, Spaces/fullscreen combinations and long lecture sessions still require validation. UAC/security desktops, DRM and exclusive fullscreen games are outside the current guarantees.
+1. Launch DansoonPen and choose **Start drawing**, or press **Option+Z** on macOS.
+2. Draw with the pen. The toolbar controls your tool, color, and size.
+3. Press **Option+Z** again, or **Esc**, to interact with your apps. Your notes stay visible and the toolbar disappears.
+4. Press **Option+Z** to draw again. Each new drawing session starts with your saved default pen.
+5. Press **Option+X**, or click the trash button, to clear all annotations. While drawing, the current tool and toolbar stay active.
+
+Windows defaults use **Alt+Shift+Z** and **Alt+Shift+X**. You can change them in Settings.
+
+**For screen sharing, share the entire display.** Sharing an individual app window may exclude the annotation overlay. Check the receiving screen before your lecture.
+
+## Shortcuts
+
+Global shortcuts work while other apps are active and can be changed in Settings. These are the defaults:
+
+| Action | macOS | Windows |
+| --- | --- | --- |
+| Draw ↔ interact | `Option+Z` | `Alt+Shift+Z` |
+| Clear all; keep current mode/tool | `Option+X` | `Alt+Shift+X` |
+| Hide / show annotations | `Option+V` | `Alt+Shift+V` |
+| Settings, while DansoonPen is active | `Cmd+,` | `Ctrl+,` |
+| Interact with apps; keep annotations | `Esc` | `Esc` |
+| Undo / redo | `Cmd+Z` / `Cmd+Shift+Z` | `Ctrl+Z` / `Ctrl+Shift+Z` |
+
+While drawing: **P** pen · **H** highlighter · **A** arrow · **T** text · **E** eraser · **C** cursor highlight. Use **1–6** for quick colors, **[ / ]** for tool size, and **Shift+1–3** for presets. Tool shortcuts do not intercept text input.
+
+To customize a global shortcut, focus its field, press and release the combination, then choose **Apply shortcuts**. Registration conflicts are reported; DansoonPen cannot detect every OS or application shortcut in advance.
+
+## Using DansoonPen
+
+### Text you can edit
+
+Select **Text** and click to type. Press **Enter** to finish, **Shift+Enter** for a new line, or **Esc** to cancel. With Text selected, click an existing annotation to edit it again. Drag its handle to move it, or use the editor's color and size controls. The default text size is **40px**.
+
+### Colors, sizes, and presets
+
+Choose a quick color or open the color wheel for hue, saturation, brightness, and HEX input. Each tool has its own size controls; the default pen is yellow and **12px**. The toolbar changes your current tool. Settings save the defaults used when you start drawing again. Save favorite combinations to three named presets.
+
+### Clear, hide, and recover
+
+The trash button clears all displays with a short fade. It does **not** leave drawing mode. **Clear this display** affects the toolbar's display; the equivalent tray action uses the display under the cursor. **Restore last clear** recovers the last cleared annotations until a subsequent edit or undo/redo invalidates that recovery. Hide/show keeps both annotations and history.
+
+### Multiple displays and the toolbar
+
+Move the cursor to another connected display to draw there—no display selector is needed. Drag the toolbar by its handle, including between monitors. Its display, position, collapsed state, and compact/full view are saved. A single continuous stroke across a monitor boundary is not supported yet.
+
+### Korean / English
+
+Open **Settings → Language / 언어** and choose **English** or **한국어**. The choice is saved and updates the interface and tray menu without restarting. Existing installations start in Korean. Your annotation text and saved preset names are preserved.
+
+## Platform status and limits
+
+| Platform | Current status |
+| --- | --- |
+| macOS Apple Silicon | Local builds and selected native workflows tested; broader release validation ongoing |
+| macOS Intel | Not verified |
+| Windows | Implementation present; real-device validation pending |
+| Linux | Not supported by this project |
+
+- **Annotations are temporary.** They live in memory and disappear when the app quits. Session saving and image export are not implemented. Closing the settings window hides it; **Quit app** exits.
+- Annotations stay at screen coordinates; they do not follow scrolling content or slide changes. The eraser removes whole objects, not individual pixels.
+- Input/focus recovery and gray-overlay fixes are included. Long teaching sessions, sleep/wake, mixed-DPI layouts, and screen-sharing receivers still need broader verification. See the [test records](docs/testing/verification.md); most engineering notes are in Korean.
+- Settings and bounded diagnostic logs stay on your computer. Diagnostics exclude annotation text and screen images. Review logs before sharing them. See [diagnostics](docs/testing/diagnostics.md).
 
 ## Contribute
 
-Bug reports, reproducible test cases, Windows testing and translation improvements are welcome. Include OS/app versions, display scaling and the steps to reproduce. Screenshots and logs should be stripped of private teaching material or other sensitive information.
+Reproducible bug reports, Windows testing, and translation improvements are especially helpful. Include your OS/app version, monitor arrangement and scaling, steps to reproduce, and expected behavior. Remove private lecture material from screenshots and logs.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development expectations. Translation source messages are Korean; English translations live in [`src/locales/en.json`](src/locales/en.json). Keep placeholders such as `{0}` unchanged, and never translate annotation contents or user-authored preset names. The native menu uses the same catalog. Run the tests after changing translations.
+See [CONTRIBUTING.md](CONTRIBUTING.md). English translations live in [`src/locales/en.json`](src/locales/en.json); keep placeholders such as `{0}` unchanged.
 
-## License and attribution
+## License
 
-Original author: **김준현**. Code is distributed under the [Apache License 2.0](LICENSE). Retain the license and applicable copyright/attribution notices when redistributing, and mark modified files as required by that license. [NOTICE](NOTICE) identifies the original project; its official repository URL will be added when the public repository exists.
+Created by **김준현 (Junhyun Kim)**. DansoonPen code is licensed under [Apache-2.0](LICENSE). Redistribution must preserve the applicable license, copyright, and attribution notices; see [NOTICE](NOTICE).
 
-Apache-2.0 does not require publishing a fork's source code or permanently displaying the original author's name on the main app screen. My Brush includes author attribution in About.
-
-The unmodified bundled Nanum Gothic font is separately licensed under [SIL OFL 1.1](src/assets/fonts/nanum-gothic/OFL.txt). Its [source and checksums](src/assets/fonts/nanum-gothic/SOURCE.json), original license, and dependency notices in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) accompany distributions.
-
-My Brush is independently implemented and is not affiliated with ScreenBrush. It does not use ScreenBrush code, icons or branding. This statement is not a completed trademark or patent clearance review.
+The bundled, unmodified Nanum Gothic font uses [SIL OFL 1.1](src/assets/fonts/nanum-gothic/OFL.txt). Dependency licenses are reproduced in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).

@@ -1,6 +1,6 @@
-# My Brush 첫 오픈소스 공개 계획
+# DansoonPen 첫 오픈소스 공개 계획
 
-작성: 2026-09-21. 아래 홍보 순서는 My Brush의 강의·발표 용도에 맞춘 제안이며 노출량이나 사용자 수를 보장하지 않는다. 외부 게시·저장소 생성·push는 아직 하지 않았다.
+작성: 2026-09-21. 아래 홍보 순서는 DansoonPen의 강의·발표 용도에 맞춘 제안이며 노출량이나 사용자 수를 보장하지 않는다. 외부 게시·저장소 생성·push는 아직 하지 않았다.
 
 ## 누구에게 무엇을 보여줄까
 
@@ -28,7 +28,7 @@ Product Hunt는 소개 페이지와 갤러리 등 출시 자료를 미리 준비
 - [x] Apache-2.0 LICENSE, 원저작자 NOTICE, 의존성 및 폰트 고지 유지.
 - [x] 한국어·영어 README와 앱 언어 선택 구현.
 - [x] 기여 안내와 버그·기능 제안 템플릿 준비.
-- [ ] v0.6.3 별도 작업본과 공개할 main의 기준 통합 확인. 실행 앱보다 기능이 적은 버전을 공개하지 않기.
+- [x] v0.6.3 별도 작업본의 기능과 한국어·영어 지원을 v0.7.0에 통합.
 - [ ] GitHub 소유 계정·저장소 이름 확정 후 NOTICE·앱 정보·README에 검증된 URL 기입. 지금은 가짜 링크를 넣지 않는다.
 - [ ] 현재 파일뿐 아니라 Git 이력의 토큰·개인 경로·내부 메모·작성자 이메일을 확인. 개인 경로는 비밀키와 다르지만 공개 의도를 확인할 자료다. 이력을 임의로 삭제하거나 재작성하지 않는다.
 - [ ] macOS 다른 기기에서 다운로드·설치·첫 실행 검사, Developer ID 서명·공증 여부와 한계를 릴리스에 명시.
@@ -49,9 +49,9 @@ Product Hunt는 소개 페이지와 갤러리 등 출시 자료를 미리 준비
 
 ## 한국어 게시 초안
 
-제목: **Show GN: My Brush — 강의 화면에 필기를 남기는 오픈소스 도구**
+제목: **Show GN: DansoonPen — 강의 화면에 필기를 남기는 오픈소스 도구**
 
-강의를 하면서 화면에 그린 표시가 설명 도중 사라지거나, 지울 때마다 드로잉 모드가 풀리는 것이 불편해서 My Brush를 만들었습니다.
+강의를 하면서 화면에 그린 표시가 설명 도중 사라지거나, 지울 때마다 드로잉 모드가 풀리는 것이 불편해서 DansoonPen을 만들었습니다.
 
 필기는 직접 지울 때까지 유지되고, 다른 앱을 조작할 때도 화면에 남습니다. 휴지통은 그림만 지우며 도구와 메뉴 독을 유지합니다. 펜·형광펜·화살표·재편집 가능한 텍스트, 실행 취소, 한국어·영어 UI를 제공합니다. Tauri/Rust/Svelte로 만들었고 계정이나 서버 연결 없이 사용합니다.
 
@@ -61,9 +61,9 @@ Product Hunt는 소개 페이지와 갤러리 등 출시 자료를 미리 준비
 
 ## English draft
 
-Title: **Show HN: My Brush — persistent screen annotations for teaching**
+Title: **Show HN: DansoonPen — persistent screen annotations for teaching**
 
-I teach and often need to mark up my screen while explaining code or slides. I built My Brush so annotations stay until I clear them, and clearing doesn't interrupt drawing by dismissing the toolbar.
+I teach and often need to mark up my screen while explaining code or slides. I built DansoonPen so annotations stay until I clear them, and clearing doesn't interrupt drawing by dismissing the toolbar.
 
 It includes a pen, highlighter, arrows, editable text, undo/redo and a Korean/English interface. It is built with Tauri, Rust and Svelte and works without an account or server.
 
@@ -77,6 +77,6 @@ Before posting, add the actual repository, download and demo URLs, and update th
 
 ## 출처 표시의 정확한 의미
 
-현재 Apache-2.0은 재배포 시 관련 저작권·NOTICE·라이선스 고지 보존 등의 의무를 둔다. 수정본의 메인 화면에 항상 원저작자 이름을 띄우거나 수정본 소스를 공개하도록 요구하지는 않는다. My Brush의 정보 화면에는 원저작자를 표시한다. [Apache-2.0 원문, 특히 4조](https://www.apache.org/licenses/LICENSE-2.0)
+현재 Apache-2.0은 재배포 시 관련 저작권·NOTICE·라이선스 고지 보존 등의 의무를 둔다. 수정본의 메인 화면에 항상 원저작자 이름을 띄우거나 수정본 소스를 공개하도록 요구하지는 않는다. DansoonPen의 정보 화면에는 원저작자를 표시한다. [Apache-2.0 원문, 특히 4조](https://www.apache.org/licenses/LICENSE-2.0)
 
 공개 저장소에는 README·기여 방법·라이선스 등 기본 문서를 함께 제공하는 것이 좋다. [Starting an Open Source Project](https://opensource.guide/starting-a-project/)

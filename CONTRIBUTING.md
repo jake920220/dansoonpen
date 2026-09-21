@@ -6,9 +6,36 @@ Bug reports, translation improvements and testing on real Windows/macOS hardware
 
 ## Development
 
-Follow the setup and validation commands in [README.md](README.md). Keep changes focused on one feature or fix, explain the behavior before and after, and include meaningful regression tests. Keep the app lightweight: avoid unnecessary dependencies, continuous rendering and per-pointer-sample IPC.
+Start with the setup in [README.md](README.md). Keep changes focused on one feature or fix, explain the behavior before and after, and include meaningful regression tests. Keep the app lightweight: avoid unnecessary dependencies, continuous rendering and per-pointer-sample IPC.
 
 Native input, focus, transparency, display scaling and global shortcuts must be tested in the desktop app. Browser previews cannot establish native support. Validate screen sharing on the receiving device as well as the sender. Clearly label environments that have not been tested.
+
+## Checks and packaging
+
+```sh
+npm run check
+npm test
+cargo fmt --check --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+node scripts/generate-notices.mjs --check
+```
+
+`npm run dev` is a development-only browser preview. Use `npm run tauri dev` for native testing. Build on the target OS:
+
+```sh
+# Populate dependency sources before generating distribution notices.
+cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+node scripts/generate-notices.mjs
+
+# macOS: build and produce a local ad-hoc signed ZIP in artifacts/
+bash scripts/package-macos.sh
+
+# Windows: installer, run on Windows
+npm run tauri build -- --bundles nsis
+```
+
+`artifacts/`, local settings, and logs do not belong in Git. A successful Windows build does not establish native behavior. macOS public binaries need a separately documented signing, notarization, and clean-machine installation process. First-release preparation is tracked in the Korean [publication guide](docs/release/repository-setup.ko.md).
 
 ## Translations
 
