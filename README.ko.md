@@ -11,7 +11,9 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 
 **Tauri·Rust·Svelte·Canvas**로 만들었습니다. 계정·서버·사용 통계 업로드 없이 로컬에서 작동합니다.
 
-> **공개 준비 버전:** 아직 공개 설치 파일은 없습니다. 현재 검증 대상은 macOS Apple Silicon입니다. Windows 구현은 포함되어 있지만 실제 Windows PC 검증은 남아 있습니다.
+> **[macOS Apple Silicon용 v0.7.0 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)** · [릴리스 안내·체크섬](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)
+>
+> 첫 공개 프리릴리스 · macOS 13 이상 · Apple Silicon(M 시리즈). Windows·Intel Mac 설치 파일은 아직 제공하지 않습니다.
 
 ## 주요 기능
 
@@ -26,15 +28,44 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 
 *실제 macOS 설정 화면입니다. 화면의 14px는 저장된 사용자 설정이며, 새 설치의 기본 펜은 12px입니다.*
 
+## 기존 브러시 도구와 무엇이 다른가요?
+
+단순펜은 강의 중 화면 브러시를 사용하며 느낀 불편에서 출발했습니다. 설명은 순간적인 포인터 표시보다 오래 이어지고, 필기와 코드 실행을 자주 오가게 됩니다. 단순펜은 다음 동작을 기본 사용 흐름으로 제공합니다.
+
+| 강의 중 필요한 순간 | 단순펜의 방식 |
+| --- | --- |
+| 그림을 보며 충분히 설명할 때 | 직접 지울 때까지 필기가 남습니다. 필기 유지에 별도 유료 업그레이드가 필요하지 않습니다. |
+| 지우고 바로 이어서 그릴 때 | 짧은 페이드로 필기만 지우고 선택한 도구와 메뉴 독을 유지합니다. |
+| 코드를 실행한 뒤 다시 필기할 때 | 앱 조작 중에도 필기는 남고, 그리기에 재진입하면 저장된 기본 펜으로 시작합니다. |
+| 수강생 앞에서 글자를 고칠 때 | 기존 텍스트를 클릭해 다시 편집합니다. 기본 글자 크기는 40px이며 한글 가독성을 위해 나눔고딕을 포함합니다. |
+| 여러 화면·언어로 강의할 때 | 앱에서 한국어·영어를 전환하고 하나의 공용 도구막대를 모니터 사이로 옮깁니다. |
+| 도구를 직접 살펴보고 개선할 때 | 계정·구독 없이 사용하며 Apache-2.0 소스를 공개합니다. Tauri/Rust와 OS WebView로 구현했습니다. |
+
+다른 도구에도 겹치는 기능이 있습니다. [DrawPen](https://github.com/DmytroVasin/DrawPen)은 여러 필기 도구와 macOS·Windows·Linux 지원을 제공하고, [gInk](https://github.com/geovens/gInk)도 오픈소스 화면 필기 도구입니다. 단순펜은 위 동작의 조합과 강의 흐름에 집중합니다. 현재 설치 파일 검증 대상은 Apple Silicon Mac이며, 다른 도구와의 메모리·속도 비교 측정은 아직 하지 않았습니다.
+
 ## 시작하기
+
+### 다운로드·설치
+
+1. [macOS Apple Silicon용 ZIP을 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)하세요. M 시리즈 Mac, macOS 13 이상이 필요합니다.
+2. 압축을 풀고 **DansoonPen.app**을 **응용 프로그램** 폴더로 옮기세요. 기존 앱을 교체한다면 실행 중인 이전 버전을 먼저 종료하세요.
+3. 앱을 열고 **Option+Z**로 필기를 시작하세요.
+
+ZIP에는 바로 실행할 수 있는 앱이 들어 있습니다. Node.js·Rust는 소스에서 직접 빌드할 때만 필요합니다. GitHub의 **Source code** 압축 파일은 설치용 앱이 아닙니다.
+
+**서명 안내:** 이번 프리릴리스는 ad-hoc 서명만 적용했고 Apple Developer ID 서명·공증은 받지 않았습니다. 첫 실행이 차단될 수 있습니다. 이 저장소에서 직접 받은 신뢰할 수 있는 앱인지 확인한 후 [Apple의 미공증 앱 실행 안내](https://support.apple.com/ko-kr/102445)를 참고하세요. Gatekeeper 전체를 끄지 마세요.
+
+[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/SHA256SUMS.txt)와 알려진 한계는 [릴리스 페이지](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)에서도 확인할 수 있습니다. 이 버전에는 Windows·Intel Mac 설치 파일이 없습니다.
 
 ### 소스에서 실행
 
 [Node.js](https://nodejs.org/)·[Rust](https://rustup.rs/)와 [Tauri의 OS별 준비 도구](https://v2.tauri.app/start/prerequisites/)를 설치하세요. 로컬 검증에는 Node.js 26·Rust 1.94를 사용하며 macOS 최소 설정은 13.0입니다. Windows 개발에는 Microsoft C++ Build Tools와 WebView2가 필요합니다.
 
-프로젝트 폴더에서 실행합니다.
+저장소를 복제한 뒤 실행합니다.
 
 ```sh
+git clone https://github.com/jake920220/dansoonpen.git
+cd dansoonpen
 npm ci
 npm run tauri dev
 ```
@@ -123,3 +154,7 @@ Windows 기본 단축키는 **Alt+Shift+Z**, **Alt+Shift+X**이며 설정에서 
 원저작자: **김준현 (Junhyun Kim)**. DansoonPen 코드는 [Apache-2.0](LICENSE)으로 배포합니다. 재배포 시 해당 라이선스·저작권·출처 고지를 보존해야 합니다. [NOTICE](NOTICE)를 참고하세요.
 
 수정 없이 포함한 나눔고딕은 [SIL OFL 1.1](src/assets/fonts/nanum-gothic/OFL.txt)을 따릅니다. 의존성 라이선스 전문은 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)에 있습니다.
+
+---
+
+단순펜이 강의나 발표에 도움이 되었다면 [이 저장소에 ⭐ Star](https://github.com/jake920220/dansoonpen)를 눌러주시면 감사하겠습니다. 꾸준히 개선하는 데 큰 힘이 됩니다!

@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — 0.7.0
+## 0.7.0 — 2026-09-21 (Pre-release)
 
-This is the first public-release candidate. No public release or version tag has been published yet.
+First public pre-release. [Release notes and macOS Apple Silicon download](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0). The app is ad-hoc signed, without Developer ID signing or Apple notarization.
 
 ### Added
 

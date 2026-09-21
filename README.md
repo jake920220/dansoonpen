@@ -11,7 +11,9 @@ DansoonPen lets you mark up slides, code, or any app without switching to a whit
 
 Built with **Tauri, Rust, Svelte, and Canvas**. Works locally, without an account, a server, or analytics uploads.
 
-> **Pre-release:** public installers are not available yet. macOS Apple Silicon is the current validation platform. Windows implementation is included, but native Windows testing is still pending.
+> **[Download v0.7.0 for macOS Apple Silicon](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)** · [Release notes & checksums](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)
+>
+> First public pre-release · macOS 13+ · Apple Silicon (M-series). Windows and Intel Mac downloads are not available yet.
 
 ## Why DansoonPen?
 
@@ -26,15 +28,44 @@ Built with **Tauri, Rust, Svelte, and Canvas**. Works locally, without an accoun
 
 *Actual macOS settings window. The 14px pen shown is a saved preference; a fresh installation defaults to 12px.*
 
+## What makes DansoonPen different?
+
+DansoonPen grew out of teaching with a screen brush: explanations often last longer than a quick pointer gesture, and switching between drawing and live coding should take as few steps as possible. Its focus is the default teaching workflow:
+
+| During a lesson | DansoonPen's approach |
+| --- | --- |
+| Explain a diagram at your own pace | Notes stay until you explicitly clear them; persistence is included without a paid upgrade. |
+| Clear the screen and carry on | A short fade clears the notes while preserving your selected tool and toolbar. |
+| Run code, then annotate again | Interact mode keeps the notes visible; re-entering drawing always selects your saved default pen. |
+| Correct a label in front of the class | Click existing text to edit it again. Text starts at 40px, with Nanum Gothic bundled for Korean readability. |
+| Work across languages and displays | Switch Korean/English in the app and move one shared toolbar between monitors. |
+| Inspect or adapt the tool | Apache-2.0 source, no account or subscription, and a Tauri/Rust implementation using the OS WebView. |
+
+Other tools also provide overlapping features: [DrawPen](https://github.com/DmytroVasin/DrawPen) offers multiple annotation tools and macOS/Windows/Linux support, and [gInk](https://github.com/geovens/gInk) is another open-source annotation tool. DansoonPen's emphasis is the combination above, with current binary validation limited to Apple Silicon Macs. No comparative memory or speed benchmark has been completed.
+
 ## Get started
+
+### Download and install
+
+1. [Download the macOS Apple Silicon ZIP](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip) (M-series Mac, macOS 13 or later).
+2. Unzip it and drag **DansoonPen.app** into **Applications**. Quit an older running copy before replacing it.
+3. Open DansoonPen and start drawing with **Option+Z**.
+
+The ZIP contains the ready-to-run app; Node.js and Rust are only needed for building from source. The **Source code** archives on GitHub are not the app download.
+
+**Signing:** this pre-release is ad-hoc signed, without an Apple Developer ID signature or notarization. macOS may block the first launch. For an app you downloaded from this repository and trust, follow [Apple's guidance for opening an unnotarized app](https://support.apple.com/en-us/102445). Do not disable Gatekeeper globally.
+
+[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/SHA256SUMS.txt) and known limitations are included on the [release page](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0). No Windows or Intel Mac installer is published for this version.
 
 ### Install from source
 
 Install [Node.js](https://nodejs.org/), [Rust](https://rustup.rs/), and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). Local validation uses Node.js 26 and Rust 1.94; the configured macOS minimum is 13.0. Windows development needs Microsoft C++ Build Tools and WebView2.
 
-From the project directory:
+Clone the repository and run:
 
 ```sh
+git clone https://github.com/jake920220/dansoonpen.git
+cd dansoonpen
 npm ci
 npm run tauri dev
 ```
@@ -123,3 +154,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). English translations live in [`src/local
 Created by **김준현 (Junhyun Kim)**. DansoonPen code is licensed under [Apache-2.0](LICENSE). Redistribution must preserve the applicable license, copyright, and attribution notices; see [NOTICE](NOTICE).
 
 The bundled, unmodified Nanum Gothic font uses [SIL OFL 1.1](src/assets/fonts/nanum-gothic/OFL.txt). Dependency licenses are reproduced in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
+
+---
+
+If DansoonPen helps with your teaching or presentations, please consider giving the [repository a ⭐ Star](https://github.com/jake920220/dansoonpen). Thank you for your support!
