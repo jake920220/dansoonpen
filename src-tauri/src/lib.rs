@@ -51,7 +51,7 @@ impl TrayShortcuts {
             (&self.clear, "모든 화면 필기 지우기"),
             (&self.clear_current, "커서가 있는 화면 필기 지우기"),
             (&self.undo_clear, "방금 지운 필기 되돌리기"),
-            (&self.quit, "My Brush 종료"),
+            (&self.quit, "DansoonPen 종료"),
         ] {
             item.set_text(tr(settings.language, label))?;
         }
@@ -223,7 +223,7 @@ fn ensure_overlay(
             .append_pair("display", id);
         let app_url = format!("index.html?{}", url.query().unwrap_or_default());
         let window = WebviewWindowBuilder::new(app, &name, WebviewUrl::App(app_url.into()))
-            .title(tr(data.app.settings.language, "My Brush 필기"))
+            .title(tr(data.app.settings.language, "DansoonPen 필기"))
             .transparent(true)
             .decorations(false)
             .shadow(false)
@@ -685,7 +685,7 @@ async fn update_settings(
         }
         for (label, window) in app.webview_windows() {
             if label.starts_with("overlay-") {
-                let _ = window.set_title(&tr(d.app.settings.language, "My Brush 필기"));
+                let _ = window.set_title(&tr(d.app.settings.language, "DansoonPen 필기"));
             }
         }
         d.app.brush = brush;
@@ -987,7 +987,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
     )?;
     // Cmd+Q is already provided by the standard macOS application menu.
     let quit_shortcut = cfg!(target_os = "macos").then_some("Command+Q");
-    let quit = MenuItem::with_id(app, "quit", text("My Brush 종료"), true, quit_shortcut)?;
+    let quit = MenuItem::with_id(app, "quit", text("DansoonPen 종료"), true, quit_shortcut)?;
     let menu = Menu::with_items(
         app,
         &[
@@ -1003,7 +1003,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         ],
     )?;
     TrayIconBuilder::with_id("brush")
-        .tooltip("My Brush")
+        .tooltip("DansoonPen")
         .icon(tauri::image::Image::new_owned(tray_pixels(), 32, 32))
         .icon_as_template(true)
         .menu(&menu)
@@ -1184,9 +1184,9 @@ pub fn run() {
                         log.record("session.start", json!({"version":env!("CARGO_PKG_VERSION"),"os":std::env::consts::OS,"arch":std::env::consts::ARCH}));
                         app.manage(log);
                     }
-                    Err(_) => eprintln!("My Brush: local diagnostics unavailable; drawing continues."),
+                    Err(_) => eprintln!("DansoonPen: local diagnostics unavailable; drawing continues."),
                 },
-                Err(_) => eprintln!("My Brush: diagnostics directory unavailable; drawing continues."),
+                Err(_) => eprintln!("DansoonPen: diagnostics directory unavailable; drawing continues."),
             }
             let previous_panic = std::panic::take_hook();
             let panic_app = app.handle().clone();
@@ -1239,7 +1239,7 @@ pub fn run() {
                 "control",
                 WebviewUrl::App("index.html?view=control".into()),
             )
-            .title("My Brush")
+            .title("DansoonPen")
             .inner_size(940., 760.)
             .min_inner_size(680., 540.)
             .build()?;
@@ -1341,7 +1341,7 @@ pub fn run() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("My Brush 실행에 실패했습니다")
+        .expect("DansoonPen 실행에 실패했습니다")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
                 diagnostics::record(app, "session.exit", json!({}));

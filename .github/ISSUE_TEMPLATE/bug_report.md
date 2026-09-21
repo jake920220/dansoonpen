@@ -16,7 +16,7 @@ assignees: ''
 3.
 
 ## Environment / 환경
-- My Brush version / 앱 버전:
+- DansoonPen version / 앱 버전:
 - OS version and CPU / 운영체제 버전·CPU:
 - Displays, resolution and scaling / 모니터 수·해상도·배율:
 - Shortcut and input language / 단축키·입력 언어:

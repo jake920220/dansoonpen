@@ -45,7 +45,7 @@ impl Diagnostics {
                         Work::Entry(bytes) => {
                             if files.write(&bytes).is_err() {
                                 eprintln!(
-                                    "My Brush: local diagnostics write failed; drawing continues."
+                                    "DansoonPen: local diagnostics write failed; drawing continues."
                                 );
                                 break;
                             }

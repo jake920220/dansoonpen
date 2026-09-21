@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "My Brush",
+  "productName": "DansoonPen",
   "version": "0.7.0",
   "identifier": "com.junhyun.my-brush",
   "build": {
@@ -21,7 +21,7 @@
     "active": true,
     "targets": "all",
     "copyright": "Copyright 2026 김준현",
-    "shortDescription": "강의용 화면 필기 오버레이",
+    "shortDescription": "Screen annotations for teaching",
     "category": "Education",
     "icon": [
       "icons/icon.png",

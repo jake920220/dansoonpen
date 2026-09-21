@@ -407,7 +407,7 @@
 </script>
 
 <svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); void commitText(); clearOverlaySelection(); hideEraser(); }} />
-{#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>{$t("이곳에 설명을 그려 보세요.")}</h1><p>{$t("브라우저에서는 그리기 도구만 미리 볼 수 있습니다.")}</p><div class="preview-note">{$t("화면 위의 표시를 유지한 채")}<br /><strong>{$t("다음 이야기로 넘어가세요.")}</strong></div></div>{/if}
+{#if !native}<div class="preview-desktop" aria-hidden="true"><span>DANSOONPEN / CANVAS PREVIEW</span><h1>{$t("이곳에 설명을 그려 보세요.")}</h1><p>{$t("브라우저에서는 그리기 도구만 미리 볼 수 있습니다.")}</p><div class="preview-note">{$t("화면 위의 표시를 유지한 채")}<br /><strong>{$t("다음 이야기로 넘어가세요.")}</strong></div></div>{/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label={$t("화면 필기 캔버스")} tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
 <div bind:this={eraserCursor} class="eraser-cursor" style:width={`${brush.eraserSize}px`} style:height={`${brush.eraserSize}px`}></div>
@@ -421,7 +421,7 @@
   <div class="draw-frame" aria-hidden="true"></div>
   <ToolbarFrame {displayId} showPanel={showPalette} oncollapse={() => showPalette = false} oninteract={() => action(() => bridge.setMode('interact'))}>
     {#snippet children(detailed: boolean)}
-      <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
+      <span class="toolbar-brand" title="DansoonPen"><Icon name="pen" size={17} /></span>
       <div class="tool-group">
         <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title={$t("펜 (P)")} aria-label={$t("펜")} onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
         {#if detailed || tool === 'highlighter'}<button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title={$t("형광펜 (H)")} aria-label={$t("형광펜")} onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>{/if}

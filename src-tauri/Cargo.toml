@@ -1,14 +1,14 @@
 [package]
-name = "my-brush"
+name = "dansoonpen"
 version = "0.7.0"
-description = "화면 위에 남기는 강의 필기"
+description = "Screen annotations for teaching and presentations"
 authors = ["김준현"]
 license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.94"
 
 [lib]
-name = "my_brush_lib"
+name = "dansoonpen_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

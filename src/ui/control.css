@@ -1,7 +1,7 @@
 .control-shell { min-height: 100%; height: 100%; display: grid; grid-template-columns: 182px minmax(0, 1fr); background: #191b22; }
 .sidebar { padding: 27px 16px 18px; border-right: 1px solid #30333d; display: flex; flex-direction: column; background: #17191f; user-select: none; }
-.brand { display: flex; gap: 9px; align-items: center; font-size: 19px; font-weight: 690; letter-spacing: -.6px; padding: 0 2px; }
-.brand-mark { width: 35px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: #ffcf56; color: #302714; border-radius: 11px; transform: rotate(-5deg); }
+.brand { display: flex; gap: 9px; align-items: center; font-size: 17px; white-space: nowrap; font-weight: 690; letter-spacing: -.6px; padding: 0 2px; }
+.brand-mark { flex-shrink: 0; width: 35px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: #ffcf56; color: #302714; border-radius: 11px; transform: rotate(-5deg); }
 .brand-caption { display: block; font-size: 7px; letter-spacing: 1.1px; font-weight: 550; color: #9b9fa9; margin-top: 3px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 7px; margin-top: 44px; }
 .sidebar nav button { border: 1px solid transparent; background: transparent; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 9px; color: #9da3b1; font-size: 13px; }

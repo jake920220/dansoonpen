@@ -8,7 +8,7 @@ const preview = !native && import.meta.env.DEV ? import('../dev/preview').then((
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (native) return invoke<T>(command, args);
   if (preview) return (await preview).invoke<T>(command, args);
-  throw new Error('My Brush 데스크톱 앱에서 열어 주세요.');
+  throw new Error('DansoonPen 데스크톱 앱에서 열어 주세요.');
 }
 
 async function subscribe<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {

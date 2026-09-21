@@ -17,15 +17,15 @@ fi
 
 brush_version="$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')"
 brush_arch="$(uname -m)"
-brush_bundle='src-tauri/target/release/bundle/macos/My Brush.app'
+brush_bundle='src-tauri/target/release/bundle/macos/DansoonPen.app'
 mkdir -p artifacts
 brush_package_dir="$(mktemp -d "$brush_root/artifacts/.macos-package.XXXXXX")"
 trap 'rm -rf -- "$brush_package_dir"' EXIT
-ditto "$brush_bundle" "$brush_package_dir/My Brush.app"
+ditto "$brush_bundle" "$brush_package_dir/DansoonPen.app"
 # Local testing signature only; this is not Developer ID signing or notarization.
-codesign --force --deep --sign - "$brush_package_dir/My Brush.app"
-codesign --verify --deep --strict "$brush_package_dir/My Brush.app"
-brush_archive="$brush_root/artifacts/My-Brush-$brush_version-macOS-$brush_arch.zip"
-ditto -c -k --sequesterRsrc --keepParent "$brush_package_dir/My Brush.app" "$brush_archive"
+codesign --force --deep --sign - "$brush_package_dir/DansoonPen.app"
+codesign --verify --deep --strict "$brush_package_dir/DansoonPen.app"
+brush_archive="$brush_root/artifacts/DansoonPen-$brush_version-macOS-$brush_arch.zip"
+ditto -c -k --sequesterRsrc --keepParent "$brush_package_dir/DansoonPen.app" "$brush_archive"
 shasum -a 256 "$brush_archive"
 echo "로컬 검증용 패키지: $brush_archive"

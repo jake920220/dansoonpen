@@ -86,7 +86,7 @@
 
 <div class="control-shell">
   <aside class="sidebar">
-    <div class="brand"><span class="brand-mark"><Icon name="pen" size={24} /></span><span>my brush<span class="brand-caption">SCREEN ANNOTATION</span></span></div>
+    <div class="brand"><span class="brand-mark"><Icon name="pen" size={24} /></span><span>DansoonPen<span class="brand-caption">SCREEN ANNOTATION</span></span></div>
     <nav aria-label={$t("주 메뉴")}>
       <button class:active={tab === 'start'} onclick={() => tab = 'start'}><Icon name="pen" />{$t("시작하기")}</button>
       <button class:active={tab === 'settings'} onclick={() => tab = 'settings'}><Icon name="settings" />{$t("설정")}</button>
@@ -164,7 +164,7 @@
         </fieldset>
       </form>
     {:else}
-      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>My Brush</h1><p>{$t("설명을 오래 남기는 화면 드로잉 도구")}</p><span class="about-version">VERSION {appVersion}</span>
+      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>DansoonPen</h1><p>{$t("설명을 오래 남기는 화면 드로잉 도구")}</p><span class="about-version">VERSION {appVersion}</span>
         <div class="about-details"><div><span>{$t("원저작자")}</span><strong>{$t("김준현")}</strong></div><div><span>{$t("라이선스")}</span><strong>Apache License 2.0</strong></div><div><span>{$t("원본 저장소")}</span><strong>{$t("공개 준비 중")}</strong></div></div>
         <p class="about-note">{$t("Copyright 2026 김준현")}<br />{$t("재배포 시 관련 저작권·출처 고지를 유지해 주세요.")}<br />{$t("라이선스 전문과 고지는 설치 배포물에 함께 제공됩니다.")}</p>
         <p class="about-note">{$t("화면을 녹화하거나 서버로 전송하지 않습니다.")}<br />{$t("설정과 진단 로그를 이 기기에 저장하며, 로그에는 필기 내용을 담지 않습니다.")}<br />{$t("그림은 앱을 종료하면 사라집니다.")}</p>
