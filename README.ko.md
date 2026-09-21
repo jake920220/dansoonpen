@@ -11,9 +11,9 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 
 **Tauri·Rust·Svelte·Canvas**로 만들었습니다. 계정·서버·사용 통계 업로드 없이 로컬에서 작동합니다.
 
-> **[macOS Apple Silicon용 v0.7.0 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)** · [릴리스 안내·체크섬](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)
+> **[macOS Apple Silicon용 v0.7.1 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip)** · [릴리스 안내·체크섬](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)
 >
-> 첫 공개 프리릴리스 · macOS 13 이상 · Apple Silicon(M 시리즈). Windows·Intel Mac 설치 파일은 아직 제공하지 않습니다.
+> 프리릴리스 · macOS 13 이상 · Apple Silicon(M 시리즈). [Windows x64 테스트 설치 파일](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe)도 제공합니다. Windows 실기 검증은 대기 중이며 Intel Mac 빌드는 없습니다.
 
 ## 주요 기능
 
@@ -45,9 +45,9 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 
 ## 시작하기
 
-### 다운로드·설치
+### 다운로드·설치 — macOS
 
-1. [macOS Apple Silicon용 ZIP을 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)하세요. M 시리즈 Mac, macOS 13 이상이 필요합니다.
+1. [macOS Apple Silicon용 ZIP을 다운로드](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip)하세요. M 시리즈 Mac, macOS 13 이상이 필요합니다.
 2. 압축을 풀고 **DansoonPen.app**을 **응용 프로그램** 폴더로 옮기세요. 기존 앱을 교체한다면 실행 중인 이전 버전을 먼저 종료하세요.
 3. 앱을 열고 **Option+Z**로 필기를 시작하세요.
 
@@ -55,7 +55,15 @@ ZIP에는 바로 실행할 수 있는 앱이 들어 있습니다. Node.js·Rust�
 
 **서명 안내:** 이번 프리릴리스는 ad-hoc 서명만 적용했고 Apple Developer ID 서명·공증은 받지 않았습니다. 첫 실행이 차단될 수 있습니다. 이 저장소에서 직접 받은 신뢰할 수 있는 앱인지 확인한 후 [Apple의 미공증 앱 실행 안내](https://support.apple.com/ko-kr/102445)를 참고하세요. Gatekeeper 전체를 끄지 마세요.
 
-[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/SHA256SUMS.txt)와 알려진 한계는 [릴리스 페이지](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)에서도 확인할 수 있습니다. 이 버전에는 Windows·Intel Mac 설치 파일이 없습니다.
+[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS.txt)와 알려진 한계는 [릴리스 페이지](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)에서도 확인할 수 있습니다. Intel Mac 설치 파일은 아직 제공하지 않습니다.
+
+### Windows x64 테스트 설치 파일
+
+Windows 10/11의 일반 Intel/AMD x64 PC에서는 [Windows 설치 파일](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe)을 실행한 뒤 시작 메뉴에서 DansoonPen을 여세요. 개발 도구는 필요하지 않습니다. WebView2가 없으면 설치 과정에서 다운로드하므로 인터넷 연결이 필요할 수 있습니다.
+
+**코드 서명 없는 테스트 배포본**이므로 SmartScreen 또는 알 수 없는 게시자 안내가 나타날 수 있습니다. 출처와 [Windows 체크섬](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt)을 확인하세요. 자동 빌드·설치 검사는 실제 PC의 필기·한글 입력·화면공유 검증과 다릅니다. Windows ARM 네이티브 빌드는 포함하지 않습니다.
+
+**Alt+Shift+Z**로 그리기 전환, **Alt+Shift+X**로 전체 삭제를 사용하세요. [Windows 테스트 체크리스트](docs/testing/windows-v0.7.1.md)에 따라 결과를 알려주시면 개선에 도움이 됩니다.
 
 ### 소스에서 실행
 
@@ -135,7 +143,7 @@ Windows 기본 단축키는 **Alt+Shift+Z**, **Alt+Shift+X**이며 설정에서 
 | --- | --- |
 | macOS Apple Silicon | 로컬 빌드와 일부 실제 앱 동작 검증, 배포 검증 진행 중 |
 | macOS Intel | 미검증 |
-| Windows | 구현 포함, 실제 PC 검증 대기 |
+| Windows x64 | 테스트 설치 파일 제공, 실제 PC 필기·화면공유 검증 대기 |
 | Linux | 이 프로젝트의 지원 대상 아님 |
 
 - **필기는 임시 데이터입니다.** 메모리에만 보관하며 앱을 종료하면 사라집니다. 세션 저장·이미지 내보내기는 아직 없습니다. 설정창 닫기는 숨기기이며, **앱 종료**는 완전 종료입니다.

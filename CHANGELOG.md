@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — 2026-09-21 (Pre-release)
+
+- Added a Windows x64 NSIS test installer, automated Windows checks, and a real-device test checklist.
+- Fixed Windows diagnostic log writes failing with access denied: the log lock handle now includes read access, as required for Windows file locking. Existing rotation and persistence tests cover the failure.
+- Windows drawing, Korean IME, display scaling, and screen-sharing still await real-device feedback.
+- [Downloads and release notes](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1).
+
 ## 0.7.0 — 2026-09-21 (Pre-release)
 
 First public pre-release. [Release notes and macOS Apple Silicon download](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0). The app is ad-hoc signed, without Developer ID signing or Apple notarization.

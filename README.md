@@ -11,9 +11,9 @@ DansoonPen lets you mark up slides, code, or any app without switching to a whit
 
 Built with **Tauri, Rust, Svelte, and Canvas**. Works locally, without an account, a server, or analytics uploads.
 
-> **[Download v0.7.0 for macOS Apple Silicon](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip)** · [Release notes & checksums](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0)
+> **[Download v0.7.1 for macOS Apple Silicon](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip)** · [Release notes & checksums](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1)
 >
-> First public pre-release · macOS 13+ · Apple Silicon (M-series). Windows and Intel Mac downloads are not available yet.
+> Pre-release · macOS 13+ · Apple Silicon (M-series). [Windows x64 test installer](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) is also available; real-device validation is pending. Intel Mac builds are not available.
 
 ## Why DansoonPen?
 
@@ -45,9 +45,9 @@ Other tools also provide overlapping features: [DrawPen](https://github.com/Dmyt
 
 ## Get started
 
-### Download and install
+### Download and install — macOS
 
-1. [Download the macOS Apple Silicon ZIP](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/DansoonPen-0.7.0-macOS-arm64.zip) (M-series Mac, macOS 13 or later).
+1. [Download the macOS Apple Silicon ZIP](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-macOS-arm64.zip) (M-series Mac, macOS 13 or later).
 2. Unzip it and drag **DansoonPen.app** into **Applications**. Quit an older running copy before replacing it.
 3. Open DansoonPen and start drawing with **Option+Z**.
 
@@ -55,7 +55,15 @@ The ZIP contains the ready-to-run app; Node.js and Rust are only needed for buil
 
 **Signing:** this pre-release is ad-hoc signed, without an Apple Developer ID signature or notarization. macOS may block the first launch. For an app you downloaded from this repository and trust, follow [Apple's guidance for opening an unnotarized app](https://support.apple.com/en-us/102445). Do not disable Gatekeeper globally.
 
-[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.0/SHA256SUMS.txt) and known limitations are included on the [release page](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.0). No Windows or Intel Mac installer is published for this version.
+[SHA256SUMS.txt](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS.txt) and known limitations are included on the [release page](https://github.com/jake920220/dansoonpen/releases/tag/v0.7.1). Intel Mac installers are not published for this version.
+
+### Windows x64 test installer
+
+[Download the Windows installer](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/DansoonPen-0.7.1-Windows-x64-setup.exe) for Windows 10/11 on Intel/AMD x64 PCs. Run the installer, then launch DansoonPen from the Start menu. Development tools are not required; if WebView2 is missing, setup may download it and require internet access.
+
+This is an **unsigned test build**, so SmartScreen or an unknown-publisher warning may appear. Verify the source and [Windows checksum](https://github.com/jake920220/dansoonpen/releases/download/v0.7.1/SHA256SUMS-Windows.txt). The automated Windows build and installation checks do not establish real-device drawing, IME, or screen-sharing support. Windows ARM native builds are not included.
+
+Start with **Alt+Shift+Z** to draw and **Alt+Shift+X** to clear. Please report your results using the [Windows test checklist (Korean)](docs/testing/windows-v0.7.1.md).
 
 ### Install from source
 
@@ -135,7 +143,7 @@ Open **Settings → Language / 언어** and choose **English** or **한국어**.
 | --- | --- |
 | macOS Apple Silicon | Local builds and selected native workflows tested; broader release validation ongoing |
 | macOS Intel | Not verified |
-| Windows | Implementation present; real-device validation pending |
+| Windows x64 | Test installer available; real-device drawing and screen-sharing validation pending |
 | Linux | Not supported by this project |
 
 - **Annotations are temporary.** They live in memory and disappear when the app quits. Session saving and image export are not implemented. Closing the settings window hides it; **Quit app** exits.
