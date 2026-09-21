@@ -1,18 +1,29 @@
-# 기여 안내
+# Contributing
 
-기여 코드는 프로젝트의 Apache-2.0 조건으로 제공할 수 있는 코드여야 합니다. 타 제품의 소스·아이콘·유료 에셋을 허가 없이 가져오지 마세요. 의존성을 추가하거나 수정하면 라이선스 고지와 해당 소스 제공 조건을 함께 검토합니다.
+**English** | [한국어](CONTRIBUTING.ko.md)
 
-원본 LICENSE·NOTICE의 관련 고지를 유지하고, 수정 파일에는 변경 사항을 식별할 수 있게 남겨 주세요. 공개 저장소 URL이 정해지면 NOTICE와 앱 정보 화면을 함께 갱신합니다. 별도의 저작권 양도나 임의의 추가 라이선스 조건을 요구하지 않습니다.
+Bug reports, translation improvements and testing on real Windows/macOS hardware are welcome. Public repository links will be added once the repository exists.
 
-## 변경 단위
+## Development
 
-- 관련 기능과 검증을 한 작업으로 묶습니다. 불필요한 라이브러리·주기적 렌더 루프·포인터 샘플마다의 IPC를 피합니다.
-- 커밋 제목은 `feat(ink): 필기 기능 추가`처럼 타입·범위·한국어 목적을 적고, 본문에는 세부 변경을 목록으로 적습니다.
-- 스테이징 전 `git status`와 파일 목록, 커밋 전 diff와 검증 결과를 확인합니다. 무관한 변경을 포함하지 않습니다.
-- 리모트 연결·push·릴리스 공개는 별도 요청된 경우에만 수행합니다.
+Follow the setup and validation commands in [README.md](README.md). Keep changes focused on one feature or fix, explain the behavior before and after, and include meaningful regression tests. Keep the app lightweight: avoid unnecessary dependencies, continuous rendering and per-pointer-sample IPC.
 
-## 검증
+Native input, focus, transparency, display scaling and global shortcuts must be tested in the desktop app. Browser previews cannot establish native support. Validate screen sharing on the receiving device as well as the sender. Clearly label environments that have not been tested.
 
-README의 check·test·clippy를 실행하세요. 오버레이/입력 변경은 실제 앱에서도 확인해야 합니다. 브라우저 통과를 macOS 또는 Windows 실기 통과로 기록하지 않습니다. 회의 화면은 송신자뿐 아니라 수신 기기에서 확인합니다.
+## Translations
 
-의존성 변경 후 `node scripts/generate-notices.mjs`로 고지를 갱신하고 `node scripts/generate-notices.mjs --check`로 일치 여부를 확인합니다. 공급된 의존성 코드를 직접 수정했다면 해당 라이선스의 소스 제공·변경 표시 의무를 별도로 반영하세요.
+The interface supports `ko` and `en`. Korean source messages are the fallback; English translations live in `src/locales/en.json`. Svelte components use the reactive `t` store, and native menus read the same catalog. Preserve all placeholders, keyboard shortcuts and accessibility labels. Do not translate or rewrite annotation contents or user-authored preset names. Run `npm test`, `npm run check` and the native tests after changes.
+
+The language setting is a persisted settings field, not a drawing tool option. A language-only update must preserve annotations, current tool, presets, shortcuts and mode. Resetting drawing defaults must not unexpectedly reset the selected language.
+
+## Reports and patches
+
+Describe expected and actual behavior, reproduction steps, OS/app version and monitor resolution/scaling. Include a timestamp for diagnostic-log correlation. Review logs and screenshots for private information before attaching them. Do not post credentials or private lecture material.
+
+Use focused commits. This repository's current maintainers use Conventional Commit subjects with a Korean description and a bullet list of details in the body. Review staged files and validation results before committing. Remote configuration, push and public releases are separate maintainer actions.
+
+## Licensing
+
+Contributions must be code you can distribute under Apache-2.0. Do not copy another product's code, icons or paid assets without permission. Preserve applicable LICENSE and NOTICE information and mark modifications as required by the license. No copyright assignment or additional contribution license is requested.
+
+When changing dependencies, regenerate notices with `node scripts/generate-notices.mjs` and verify with `node scripts/generate-notices.mjs --check`. Review any dependency-specific source-distribution or modification-notice obligations.
