@@ -206,7 +206,8 @@ impl RotatingFile {
 }
 fn private_append(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
-    options.create(true).append(true);
+    // Windows file locking rejects append-only handles; read access permits LockFileEx.
+    options.create(true).read(true).append(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;

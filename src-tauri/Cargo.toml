@@ -1,6 +1,6 @@
 [package]
 name = "dansoonpen"
-version = "0.7.0"
+version = "0.7.1"
 description = "Screen annotations for teaching and presentations"
 authors = ["김준현"]
 license = "Apache-2.0"

@@ -14,10 +14,9 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - name: Check out v0.7.0 release source
+      - name: Check out build source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 1dd83fb137545ad909eee425ea1869fb1fbfc44b
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -55,9 +54,10 @@ jobs:
             if (-not (Test-Path (Join-Path $installDir $file))) { throw "Missing installed file: $file" }
           }
           $version = (Get-Item (Join-Path $installDir 'dansoonpen.exe')).VersionInfo.ProductVersion
-          if ($version -notlike '0.7.0*') { throw "Unexpected product version: $version" }
+          $expectedVersion = (Get-Content 'package.json' -Raw | ConvertFrom-Json).version
+          if ($version -notlike "$expectedVersion*") { throw "Unexpected product version: $version" }
           New-Item -ItemType Directory -Path 'windows-release' | Out-Null
-          $asset = 'DansoonPen-0.7.0-Windows-x64-setup.exe'
+          $asset = "DansoonPen-$expectedVersion-Windows-x64-setup.exe"
           Copy-Item $installers[0].FullName "windows-release/$asset"
           $hash = (Get-FileHash "windows-release/$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $asset" | Set-Content 'windows-release/SHA256SUMS-Windows.txt' -Encoding utf8NoBOM
@@ -72,7 +72,7 @@ jobs:
       - name: Save verified test installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: DansoonPen-0.7.0-Windows-x64
+          name: DansoonPen-Windows-x64
           path: windows-release/
           if-no-files-found: error
           retention-days: 14
