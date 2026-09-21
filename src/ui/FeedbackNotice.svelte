@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../app/i18n';
   import { untrack } from 'svelte';
   import type { Feedback } from '../shared/types';
   import { noticeLifetime } from './feedback';
@@ -20,10 +21,10 @@
 </script>
 {#if notice}
   <div class="feedback-notice" class:motion={!reduceMotion} role="status" aria-live="polite">
-    <span>{notice.message}</span>
+    <span>{$t(notice.message)}</span>
     {#if undoToken !== null}
-      {#if interactive}<button onclick={() => { if (undoToken !== null) onundo(undoToken); }}>삭제 되돌리기</button>
-      {:else}<small>메뉴에서 ‘방금 지운 필기 되돌리기’</small>{/if}
+      {#if interactive}<button onclick={() => { if (undoToken !== null) onundo(undoToken); }}>{$t("삭제 되돌리기")}</button>
+      {:else}<small>{$t("메뉴에서 ‘방금 지운 필기 되돌리기’")}</small>{/if}
     {/if}
   </div>
 {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../app/i18n';
   import type { Tool } from '../shared/types';
   import { SIZE_SPECS } from '../shared/tool-size';
   import { FONT_FAMILY } from '../canvas/geometry';
@@ -8,19 +9,19 @@
   let spec = $derived(SIZE_SPECS[tool]);
 </script>
 <div class="size-control">
-  <div class="size-heading"><span>{spec.label}</span><output>{value}px</output></div>
-  <div class="quick-sizes" aria-label={`${spec.label} 빠른 선택`}>
+  <div class="size-heading"><span>{$t(spec.label)}</span><output>{value}px</output></div>
+  <div class="quick-sizes" aria-label={$t("{0} 빠른 선택", [$t(spec.label)])}>
     {#each spec.quick as size, i}
-      <button class:chosen={size === value} aria-pressed={size === value} onclick={() => onchange(size)}>{['작게', '보통', '크게'][i]} <span>{size}</span></button>
+      <button class:chosen={size === value} aria-pressed={size === value} onclick={() => onchange(size)}>{[$t("작게"), $t("보통"), $t("크게")][i]} <span>{size}</span></button>
     {/each}
   </div>
-  <input aria-label={spec.label} type="range" min={spec.min} max={spec.max} step={spec.step} {value} oninput={(e) => onchange(Number(e.currentTarget.value))} />
-  <div class="size-preview" aria-label={`${value}px 실제 크기 미리보기`}>
-    {#if tool === 'text'}<span style:font-family={FONT_FAMILY} style:font-size={`${value}px`} style:color={color}>가 Aa</span>
+  <input aria-label={$t(spec.label)} type="range" min={spec.min} max={spec.max} step={spec.step} {value} oninput={(e) => onchange(Number(e.currentTarget.value))} />
+  <div class="size-preview" aria-label={$t("{0}px 실제 크기 미리보기", [value])}>
+    {#if tool === 'text'}<span style:font-family={FONT_FAMILY} style:font-size={`${value}px`} style:color={color}>{$t("가 Aa")}</span>
     {:else if tool === 'eraser'}<div class="eraser-sample" style:width={`${value}px`} style:height={`${value}px`}></div>
     {:else}<svg width="210" height="76" aria-hidden="true"><path d="M24 49 Q63 10 107 38 T186 28" fill="none" stroke={color} stroke-width={value} stroke-linecap="round" opacity={tool === 'highlighter' ? opacity : 1} /></svg>{/if}
   </div>
-  <p>실제 크기 미리보기 · [ 작게 · ] 크게</p>
+  <p>{$t("실제 크기 미리보기 · [ 작게 · ] 크게")}</p>
 </div>
 <style>
   .size-control { margin-top: 18px; color: #d4dce9; }

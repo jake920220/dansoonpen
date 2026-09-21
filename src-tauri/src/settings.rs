@@ -66,6 +66,9 @@ pub fn load(path: &Path) -> Result<AppSettings, String> {
     if settings.version == 4 {
         settings.version = 5;
     }
+    if settings.version == 5 {
+        settings.version = 6;
+    }
     settings.validate()?;
     Ok(settings)
 }
@@ -162,6 +165,46 @@ mod tests {
 
     use super::*;
     #[test]
+    fn language_migration_round_trip_and_independent_patches_preserve_user_data() {
+        use crate::model::{Language, SettingsPatch};
+        let path =
+            std::env::temp_dir().join(format!("my-brush-language-{}.json", std::process::id()));
+        let mut old = AppSettings {
+            width: 19.,
+            ..AppSettings::default()
+        };
+        old.presets[0].name = "내 강의".into();
+        let mut json = serde_json::to_value(&old).unwrap();
+        json["version"] = 5.into();
+        json.as_object_mut().unwrap().remove("language");
+        std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+        let loaded = load(&path).unwrap();
+        assert_eq!(loaded.language, Language::Ko);
+        assert_eq!(loaded.version, 6);
+        let patch = SettingsPatch {
+            language: Some(Language::En),
+            ..Default::default()
+        };
+        let brush = crate::model::BrushSettings::from_defaults(&loaded);
+        assert_eq!(patch.brush_patch().apply(&brush), brush);
+        let english = patch.apply(&loaded);
+        assert_eq!(english.width, 19.);
+        assert_eq!(english.presets, loaded.presets);
+        assert_eq!(english.toggle_shortcut, loaded.toggle_shortcut);
+        save(&path, &english).unwrap();
+        assert_eq!(load(&path).unwrap(), english);
+        let recolored = SettingsPatch {
+            color: Some("#123456".into()),
+            ..Default::default()
+        }
+        .apply(&english);
+        assert_eq!(recolored.language, Language::En);
+        assert!(serde_json::from_str::<SettingsPatch>(r#"{"language":"fr"}"#).is_err());
+        assert!(serde_json::from_str::<SettingsPatch>(r#"{"language":42}"#).is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn lecture_text_size_migrates_once_and_preserves_custom_preferences() {
         let path =
             std::env::temp_dir().join(format!("my-brush-text-size-{}.json", std::process::id()));
@@ -225,7 +268,7 @@ mod tests {
         settings.toggle_shortcut = "Command+Shift+D".into();
         std::fs::write(&path, serde_json::to_vec(&settings).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 5);
+        assert_eq!(loaded.version, 6);
         assert_eq!(loaded.width, 19.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.toggle_shortcut, settings.toggle_shortcut);
@@ -264,7 +307,7 @@ mod tests {
         json.as_object_mut().unwrap().remove("presets");
         std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.version, 5);
+        assert_eq!(loaded.version, 6);
         assert_eq!(loaded.width, 17.);
         assert_eq!(loaded.color, "#123456");
         assert_eq!(loaded.presets.len(), 3);

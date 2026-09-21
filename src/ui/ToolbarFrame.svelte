@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../app/i18n';
   import { onMount, type Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   import { DEFAULT_POSITION, readPosition, toolbarBounds } from './toolbar-position';
@@ -47,14 +48,14 @@
 </script>
 <svelte:window bind:innerWidth={vw} bind:innerHeight={vh} />
 <div class="toolbar-area" style:left={`${left}px`} style:top={`${top}px`}>
-  <div class="toolbar" bind:this={bar} bind:clientWidth={width} bind:clientHeight={height} role="toolbar" aria-label="그리기 도구">
-    <button class="toolbar-grip" aria-label="도구막대 이동" title="드래그로 이동 · 방향키 이동 · 두 번 클릭 또는 Home으로 위치 초기화" onpointerdown={start} onpointermove={move} onpointerup={end} onpointercancel={end} onlostpointercapture={end} ondblclick={reset} onkeydown={keyboard}><Icon name="grip" size={16} /></button>
+  <div class="toolbar" bind:this={bar} bind:clientWidth={width} bind:clientHeight={height} role="toolbar" aria-label={$t("그리기 도구")}>
+    <button class="toolbar-grip" aria-label={$t("도구막대 이동")} title={$t("드래그로 이동 · 방향키 이동 · 두 번 클릭 또는 Home으로 위치 초기화")} onpointerdown={start} onpointermove={move} onpointerup={end} onpointercancel={end} onlostpointercapture={end} ondblclick={reset} onkeydown={keyboard}><Icon name="grip" size={16} /></button>
     {#if !position.collapsed}{@render children(position.detailed)}
-      <button aria-label={position.detailed ? '간단히 보기' : '도구 더보기'} aria-expanded={position.detailed} title={position.detailed ? '자주 쓰는 도구만 표시' : '형광펜·화살표·프리셋·추가 도구'} onclick={() => { position.detailed = !position.detailed; oncollapse(); save(); }}><Icon name="more" size={18} /></button>{:else}
+      <button aria-label={position.detailed ? $t("간단히 보기") : $t("도구 더보기")} aria-expanded={position.detailed} title={position.detailed ? $t("자주 쓰는 도구만 표시") : $t("형광펜·화살표·프리셋·추가 도구")} onclick={() => { position.detailed = !position.detailed; oncollapse(); save(); }}><Icon name="more" size={18} /></button>{:else}
       <span class="compact-label">My Brush</span>
-      <button aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={oninteract}><Icon name="pointer" size={18} /></button>
+      <button aria-label={$t("앱 조작으로 돌아가기")} title={$t("그림을 유지하고 앱 조작 (Esc)")} onclick={oninteract}><Icon name="pointer" size={18} /></button>
     {/if}
-    <button aria-label={position.collapsed ? '도구막대 펼치기' : '도구막대 접기'} title={position.collapsed ? '도구막대 펼치기' : '도구막대 접기'} aria-expanded={!position.collapsed} onclick={collapse}><Icon name={position.collapsed ? 'expand' : 'collapse'} size={17} /></button>
+    <button aria-label={position.collapsed ? $t("도구막대 펼치기") : $t("도구막대 접기")} title={position.collapsed ? $t("도구막대 펼치기") : $t("도구막대 접기")} aria-expanded={!position.collapsed} onclick={collapse}><Icon name={position.collapsed ? 'expand' : 'collapse'} size={17} /></button>
   </div>
 </div>
 {#if showPanel && !position.collapsed}

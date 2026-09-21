@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../app/i18n';
   import { untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import { hexToHsv, hsvToHex, wheelPosition, type HSV } from '../shared/color';
@@ -40,34 +41,34 @@
   }
   function applyHex() {
     const normalized = hex.startsWith('#') ? hex : `#${hex}`;
-    if (!/^#[0-9a-f]{6}$/i.test(normalized)) { hexError = '6자리 색상 코드를 입력해 주세요.'; return; }
+    if (!/^#[0-9a-f]{6}$/i.test(normalized)) { hexError = $t("6자리 색상 코드를 입력해 주세요."); return; }
     hexError = ''; onchange(normalized.toLowerCase());
   }
 </script>
 
 <div class="color-palette">
-  <div class="color-swatches" role="group" aria-label="빠른 색상">
+  <div class="color-swatches" role="group" aria-label={$t("빠른 색상")}>
     {#each colors as color, i}
       <button type="button" class="color-swatch" class:selected={value.toLowerCase() === color.toLowerCase()}
-        style:background={color} aria-label={`색상 ${i + 1} ${color.toUpperCase()}`} aria-pressed={value.toLowerCase() === color.toLowerCase()}
-        title={`색상 ${i + 1} · ${color.toUpperCase()}`} onclick={() => { slot = i; onchange(color); }}>
+        style:background={color} aria-label={$t("색상 {0} {1}", [i + 1, color.toUpperCase()])} aria-pressed={value.toLowerCase() === color.toLowerCase()}
+        title={$t("색상 {0} · {1}", [i + 1, color.toUpperCase()])} onclick={() => { slot = i; onchange(color); }}>
         {#if value.toLowerCase() === color.toLowerCase()}<Icon name="check" size={17} />{/if}
       </button>
     {/each}
-    <button type="button" class="spectrum-swatch" aria-label="색상환 열기" aria-expanded={expanded} title="색상환에서 고르기" onclick={() => expanded = !expanded}><span>{expanded ? '−' : '+'}</span></button>
+    <button type="button" class="spectrum-swatch" aria-label={$t("색상환 열기")} aria-expanded={expanded} title={$t("색상환에서 고르기")} onclick={() => expanded = !expanded}><span>{expanded ? '−' : '+'}</span></button>
   </div>
   {#if expanded}
     <div class="color-studio">
-      <div class="color-studio-heading"><span>나만의 색상</span><span class="color-preview" style:background={value}></span></div>
-      <div bind:this={wheel} class="color-wheel" role="slider" tabindex="0" aria-label="색상환" aria-valuemin="0" aria-valuemax="360" aria-valuenow={Math.round(hsv.h)} aria-valuetext={`${value}, 채도 ${Math.round(hsv.s * 100)}%`}
+      <div class="color-studio-heading"><span>{$t("나만의 색상")}</span><span class="color-preview" style:background={value}></span></div>
+      <div bind:this={wheel} class="color-wheel" role="slider" tabindex="0" aria-label={$t("색상환")} aria-valuemin="0" aria-valuemax="360" aria-valuenow={Math.round(hsv.h)} aria-valuetext={$t("{0}, 채도 {1}%", [value, Math.round(hsv.s * 100)])}
         onpointerdown={down} onpointermove={(e) => { if (pointer === e.pointerId) sample(e); }} onpointerup={up} onpointercancel={() => pointer = null} onlostpointercapture={() => pointer = null} onkeydown={keydown}>
         <div class="wheel-shade" style:opacity={1 - hsv.v}></div>
         <span class="wheel-handle" style:left={`${50 + Math.sin(hsv.h * Math.PI / 180) * hsv.s * 50}%`} style:top={`${50 - Math.cos(hsv.h * Math.PI / 180) * hsv.s * 50}%`} style:background={value}></span>
       </div>
-      <label class="brightness-control"><span>밝기</span><input type="range" min="0" max="100" aria-label="색상 밝기" value={Math.round(hsv.v * 100)} style:background={`linear-gradient(to right, #000, ${hsvToHex({ ...hsv, v: 1 })})`} oninput={(e) => change({ ...hsv, v: Number(e.currentTarget.value) / 100 })} /></label>
-      <div class="color-code-row"><span>HEX</span><input aria-label="색상 코드" bind:value={hex} maxlength="7" spellcheck="false" onblur={applyHex} onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyHex(); } }} /></div>
-      {#if hexError}<span class="color-input-error" role="alert">{hexError}</span>{/if}
-      <button class="save-swatch" type="button" onclick={() => { const next = [...colors]; next[slot] = value; onpalettechange(next); }}>빠른 색상 {slot + 1}에 저장</button>
+      <label class="brightness-control"><span>{$t("밝기")}</span><input type="range" min="0" max="100" aria-label={$t("색상 밝기")} value={Math.round(hsv.v * 100)} style:background={`linear-gradient(to right, #000, ${hsvToHex({ ...hsv, v: 1 })})`} oninput={(e) => change({ ...hsv, v: Number(e.currentTarget.value) / 100 })} /></label>
+      <div class="color-code-row"><span>HEX</span><input aria-label={$t("색상 코드")} bind:value={hex} maxlength="7" spellcheck="false" onblur={applyHex} onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyHex(); } }} /></div>
+      {#if hexError}<span class="color-input-error" role="alert">{$t(hexError)}</span>{/if}
+      <button class="save-swatch" type="button" onclick={() => { const next = [...colors]; next[slot] = value; onpalettechange(next); }}>{$t("빠른 색상 {0}에 저장", [slot + 1])}</button>
     </div>
   {/if}
 </div>

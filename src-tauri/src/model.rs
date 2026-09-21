@@ -253,9 +253,19 @@ impl Default for CursorSettings {
         }
     }
 }
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    Ko,
+    En,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AppSettings {
+    #[serde(default)]
+    pub language: Language,
     #[serde(default = "eraser_size")]
     pub eraser_size: f64,
     #[serde(default)]
@@ -287,7 +297,8 @@ fn visibility_shortcut() -> String {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            version: 5,
+            version: 6,
+            language: Language::Ko,
             eraser_size: eraser_size(),
             cursor: CursorSettings::default(),
             presets: default_presets(),
@@ -340,7 +351,7 @@ impl AppSettings {
     pub fn validate(&self) -> Result<(), String> {
         if !valid_color(&self.cursor.color)
             || !finite_range(self.cursor.size, 24., 96.)
-            || self.version != 5
+            || self.version != 6
             || !finite_range(self.eraser_size, 16., 128.)
             || self.presets.len() != 3
             || self.presets.iter().any(|p| {
@@ -368,6 +379,7 @@ impl AppSettings {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsPatch {
+    pub language: Option<Language>,
     pub eraser_size: Option<f64>,
     pub cursor: Option<CursorSettings>,
     pub presets: Option<Vec<BrushPreset>>,
@@ -393,6 +405,7 @@ impl SettingsPatch {
     }
     pub fn apply(self, current: &AppSettings) -> AppSettings {
         AppSettings {
+            language: self.language.unwrap_or(current.language),
             eraser_size: self.eraser_size.unwrap_or(current.eraser_size),
             cursor: self.cursor.unwrap_or_else(|| current.cursor.clone()),
             presets: self.presets.unwrap_or_else(|| current.presets.clone()),

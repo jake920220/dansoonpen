@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, setLanguage } from '../app/i18n';
   import { onMount, tick } from 'svelte';
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
   import { arrowEndpoint } from '../canvas/arrow';
@@ -105,6 +106,7 @@
     if (leaving) { finishPointer(); void commitText(); showPalette = false; hideEraser(); }
     const newEntry = appState && appState.brushGeneration !== next.brushGeneration;
     appState = next;
+    setLanguage(next.settings.language);
     if (newEntry) brushWriter.invalidate();
     localWidth = optimisticBrush.width ?? next.brush.width;
     localTextSize = optimisticBrush.textSize ?? next.brush.textSize;
@@ -128,7 +130,7 @@
       try {
         // Load the bundled font before text layout or hit testing can begin.
         await document.fonts.load('40px "Nanum Gothic"').catch(() => {
-          error = '나눔고딕을 불러오지 못해 기본 글꼴로 표시합니다.';
+          error = $t("나눔고딕을 불러오지 못해 기본 글꼴로 표시합니다.");
           reportDiagnostic('error');
         });
         if (disposed) return;
@@ -157,7 +159,7 @@
       } catch (e) {
         added.forEach((a) => pendingAdds.delete(a.id));
         removedIds.forEach((id) => pendingRemovals.delete(id));
-        if (!disposed) { error = `그림을 반영하지 못했습니다: ${message(e)}`; renderScene(); }
+        if (!disposed) { error = $t("그림을 반영하지 못했습니다: {0}", [message(e)]); renderScene(); }
       }
     });
   }
@@ -208,7 +210,7 @@
         appendStrokePoint(currentStroke.points, point(sample));
       }
       renderer?.setPreview(currentStroke);
-      if (currentStroke.points.length >= 100_000) { finishPointer(); error = '긴 획을 저장했습니다. 마우스를 놓고 이어서 그려 주세요.'; }
+      if (currentStroke.points.length >= 100_000) { finishPointer(); error = $t("긴 획을 저장했습니다. 마우스를 놓고 이어서 그려 주세요."); }
     } else if (currentArrow) {
       currentArrow.end = arrowEndpoint(currentArrow.start, point(event), event.shiftKey);
       renderer?.setPreview(currentArrow);
@@ -301,7 +303,7 @@
       if (settling) await new Promise<void>((resolve) => setTimeout(resolve, 0));
       const value = editor?.value ?? entry.value;
       if (textEntry !== entry || disposed) return;
-      if (new TextEncoder().encode(value).length > 40_000) { error = '텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요.'; editor?.focus(); return; }
+      if (new TextEncoder().encode(value).length > 40_000) { error = $t("텍스트가 너무 깁니다. 내용을 나누어 입력해 주세요."); editor?.focus(); return; }
       textEntry = null; textDrag = null; composing = false;
       if (!textDraftChanged(entry, value)) { renderScene(); return; }
       const removed = entry.original ? [entry.original.id] : [];
@@ -335,7 +337,7 @@
   async function savePreset() {
     const current = { ...brush }; const index = Number(presetSlot);
     presetStatus = ''; error = '';
-    try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = `${index + 1}번 프리셋에 저장했습니다.`; }
+    try { acceptState(await bridge.updatePreset(index, undefined, current)); presetStatus = $t("{0}번 프리셋에 저장했습니다.", [index + 1]); }
     catch (e) { error = message(e); }
   }
   function setSize(value: number) {
@@ -378,9 +380,9 @@
 </script>
 
 <svelte:window onresize={resize} onkeydown={keyboard} onblur={() => { finishPointer(); hideEraser(); }} />
-{#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>이곳에 설명을 그려 보세요.</h1><p>브라우저에서는 그리기 도구만 미리 볼 수 있습니다.</p><div class="preview-note">화면 위의 표시를 유지한 채<br /><strong>다음 이야기로 넘어가세요.</strong></div></div>{/if}
+{#if !native}<div class="preview-desktop" aria-hidden="true"><span>MY BRUSH / CANVAS PREVIEW</span><h1>{$t("이곳에 설명을 그려 보세요.")}</h1><p>{$t("브라우저에서는 그리기 도구만 미리 볼 수 있습니다.")}</p><div class="preview-note">{$t("화면 위의 표시를 유지한 채")}<br /><strong>{$t("다음 이야기로 넘어가세요.")}</strong></div></div>{/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label="화면 필기 캔버스" tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
+<canvas bind:this={canvas} class="drawing-surface" style:visibility={appState?.annotationsVisible ? 'visible' : 'hidden'} class:enabled={drawing} class:text-tool={tool === 'text'} class:erase-tool={tool === 'eraser'} aria-label={$t("화면 필기 캔버스")} tabindex="-1" onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancelPointer} onlostpointercapture={cancelPointer} onpointerleave={() => { if (eraserCursor) eraserCursor.style.display = 'none'; }}></canvas>
 <div bind:this={eraserCursor} class="eraser-cursor" style:width={`${brush.eraserSize}px`} style:height={`${brush.eraserSize}px`}></div>
 
 {#if appState?.cursorEnabled && appState.activeDisplayId === displayId}<CursorHighlight {displayId} settings={settings.cursor} reduceMotion={settings.reduceMotion} />{/if}
@@ -394,61 +396,61 @@
     {#snippet children(detailed: boolean)}
       <span class="toolbar-brand" title="My Brush"><Icon name="pen" size={17} /></span>
       <div class="tool-group">
-        <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title="펜 (P)" aria-label="펜" onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
-        {#if detailed || tool === 'highlighter'}<button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title="형광펜 (H)" aria-label="형광펜" onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>{/if}
-        {#if detailed || tool === 'arrow'}<button class:chosen={tool === 'arrow'} aria-pressed={tool === 'arrow'} title="화살표 (A) · Shift로 방향 맞추기" aria-label="화살표" onclick={() => chooseTool('arrow')}><Icon name="arrow" /></button>{/if}
-        <button class:chosen={tool === 'eraser'} aria-pressed={tool === 'eraser'} title="지우개 (E) · 획 단위로 지우기" aria-label="지우개" onclick={() => chooseTool('eraser')}><Icon name="eraser" /></button>
-        <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title="텍스트 (T)" aria-label="텍스트" onclick={() => chooseTool('text')}><Icon name="text" /></button>
+        <button class:chosen={tool === 'pen'} aria-pressed={tool === 'pen'} title={$t("펜 (P)")} aria-label={$t("펜")} onclick={() => chooseTool('pen')}><Icon name="pen" /></button>
+        {#if detailed || tool === 'highlighter'}<button class:chosen={tool === 'highlighter'} aria-pressed={tool === 'highlighter'} title={$t("형광펜 (H)")} aria-label={$t("형광펜")} onclick={() => chooseTool('highlighter')}><Icon name="highlighter" /></button>{/if}
+        {#if detailed || tool === 'arrow'}<button class:chosen={tool === 'arrow'} aria-pressed={tool === 'arrow'} title={$t("화살표 (A) · Shift로 방향 맞추기")} aria-label={$t("화살표")} onclick={() => chooseTool('arrow')}><Icon name="arrow" /></button>{/if}
+        <button class:chosen={tool === 'eraser'} aria-pressed={tool === 'eraser'} title={$t("지우개 (E) · 획 단위로 지우기")} aria-label={$t("지우개")} onclick={() => chooseTool('eraser')}><Icon name="eraser" /></button>
+        <button class:chosen={tool === 'text'} aria-pressed={tool === 'text'} title={$t("텍스트 (T)")} aria-label={$t("텍스트")} onclick={() => chooseTool('text')}><Icon name="text" /></button>
       </div>
       <span class="toolbar-divider"></span>
-      <button class="color-trigger" aria-label="색상과 굵기" aria-expanded={showPalette} title="색상과 굵기" onclick={() => showPalette = !showPalette}><span style:background={editingBrush.color}></span><span class="current-size">{toolSize(editingBrush)}px</span></button>
+      <button class="color-trigger" aria-label={$t("색상과 굵기")} aria-expanded={showPalette} title={$t("색상과 굵기")} onclick={() => showPalette = !showPalette}><span style:background={editingBrush.color}></span><span class="current-size">{toolSize(editingBrush)}px</span></button>
       {#if detailed}
-      <div class="tool-group preset-shortcuts" aria-label="빠른 프리셋">
-        {#each settings.presets as preset, i}<button aria-label={`프리셋 ${i + 1} ${preset.name}`} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
+      <div class="tool-group preset-shortcuts" aria-label={$t("빠른 프리셋")}>
+        {#each settings.presets as preset, i}<button aria-label={$t("프리셋 {0} {1}", [i + 1, preset.name])} title={`${preset.name} (Shift+${i + 1})`} onclick={() => applyPreset(i)}><span style:background={preset.brush.color}></span>{i + 1}</button>{/each}
       </div>
       {/if}
       <span class="toolbar-divider"></span>
       <div class="tool-group">
-        <button aria-label="실행 취소" title="실행 취소 (⌘/Ctrl+Z)" onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
-        {#if detailed}<button aria-label="다시 실행" title="다시 실행 (⌘/Ctrl+Shift+Z)" onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>{/if}
-        {#if detailed}<button aria-label="이 화면만 지우기" title="이 화면의 필기만 지우기 · 현재 도구 유지" onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>{/if}
-        <button aria-label="전체 지우기" title={`전체 지우기 (${shortcutLabel(settings.clearShortcut)})`} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
+        <button aria-label={$t("실행 취소")} title={$t("실행 취소 (⌘/Ctrl+Z)")} onclick={() => action(bridge.undo)}><Icon name="undo" size={19} /></button>
+        {#if detailed}<button aria-label={$t("다시 실행")} title={$t("다시 실행 (⌘/Ctrl+Shift+Z)")} onclick={() => action(bridge.redo)}><Icon name="redo" size={19} /></button>{/if}
+        {#if detailed}<button aria-label={$t("이 화면만 지우기")} title={$t("이 화면의 필기만 지우기 · 현재 도구 유지")} onclick={() => action(bridge.clearCurrent)}><Icon name="clear-screen" size={19} /></button>{/if}
+        <button aria-label={$t("전체 지우기")} title={$t("전체 지우기 ({0})", [shortcutLabel(settings.clearShortcut)])} onclick={() => action(bridge.clearAll)}><Icon name="clear" size={19} /></button>
       </div>
-      {#if appState?.clearUndoToken != null}<button class="clear-undo" aria-label="방금 지운 필기 되돌리기" onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={17} />삭제 복구</button>{/if}
+      {#if appState?.clearUndoToken != null}<button class="clear-undo" aria-label={$t("방금 지운 필기 되돌리기")} onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={17} />{$t("삭제 복구")}</button>{/if}
       <span class="toolbar-divider"></span>
-      {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label="그릴 화면" value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{d.name}</option>{/each}</select>{/if}
-      {#if detailed || appState?.cursorEnabled}<button aria-label="커서 강조" aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title="커서 강조 켜기/끄기 (C)" onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>{/if}
-      {#if detailed}<button aria-label="필기 잠시 숨기기" title={`필기 잠시 숨기기 (${shortcutLabel(settings.visibilityShortcut)})`} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>{/if}
-      {#if detailed}<button aria-label="설정 열기" title={`설정 열기 (${shortcutLabel(settingsShortcut)})`} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>{/if}
-      <button class="interact-button" aria-label="앱 조작으로 돌아가기" title="그림을 유지하고 앱 조작 (Esc)" onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>앱 조작</span><kbd>Esc</kbd></button>
+      {#if (appState?.displays.filter((d) => d.connected).length ?? 0) > 1}<select class="overlay-display-select" aria-label={$t("그릴 화면")} value={displayId} onchange={(e) => { const selectedId = e.currentTarget.value; void action(() => bridge.selectDisplay(selectedId)); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as d}<option value={d.id}>{$t(d.name)}</option>{/each}</select>{/if}
+      {#if detailed || appState?.cursorEnabled}<button aria-label={$t("커서 강조")} aria-pressed={appState?.cursorEnabled} class:chosen={appState?.cursorEnabled} title={$t("커서 강조 켜기/끄기 (C)")} onclick={() => action(bridge.toggleCursor)}><Icon name="cursor-halo" size={19} /></button>{/if}
+      {#if detailed}<button aria-label={$t("필기 잠시 숨기기")} title={$t("필기 잠시 숨기기 ({0})", [shortcutLabel(settings.visibilityShortcut)])} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={19} /></button>{/if}
+      {#if detailed}<button aria-label={$t("설정 열기")} title={$t("설정 열기 ({0})", [shortcutLabel(settingsShortcut)])} onclick={() => action(bridge.showControl)}><Icon name="settings" size={19} /></button>{/if}
+      <button class="interact-button" aria-label={$t("앱 조작으로 돌아가기")} title={$t("그림을 유지하고 앱 조작 (Esc)")} onclick={() => action(() => bridge.setMode('interact'))}><Icon name="pointer" size={17} /><span>{$t("앱 조작")}</span><kbd>Esc</kbd></button>
     {/snippet}
     {#snippet panel()}
       <div class="palette-panel">
-        {#if tool !== 'eraser'}<div class="palette-heading"><span>{TOOL_LABELS[tool]} 색상</span><code>{editingBrush.color.toUpperCase()}</code></div>
+        {#if tool !== 'eraser'}<div class="palette-heading"><span>{$t("{0} 색상", [$t(TOOL_LABELS[tool])])}</span><code>{editingBrush.color.toUpperCase()}</code></div>
         <ColorPalette value={editingBrush.color} colors={settings.quickColors} onchange={changeColor} onpalettechange={(quickColors) => settingsWriter.update({ quickColors })} />{/if}
         <SizeControl {tool} value={toolSize(editingBrush)} color={editingBrush.color} opacity={brush.highlighterOpacity} onchange={setSize} />
-        {#if tool === 'highlighter'}<label class="palette-range"><span>불투명도</span><input aria-label="형광펜 불투명도" type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
-        <div class="brush-reset"><span>{textEntry ? '편집 중인 글에 적용됩니다.' : '현재 도구에만 적용됩니다.'}</span><button onclick={resetBrush}>기본 펜으로</button></div>
-        <div class="preset-save"><select aria-label="저장할 프리셋" bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>현재 도구 저장</button></div>
+        {#if tool === 'highlighter'}<label class="palette-range"><span>{$t("불투명도")}</span><input aria-label={$t("형광펜 불투명도")} type="range" min="10" max="80" step="1" value={Math.round(brush.highlighterOpacity * 100)} oninput={(e) => updateBrush({ highlighterOpacity: Number(e.currentTarget.value) / 100 })} /><output>{Math.round(brush.highlighterOpacity * 100)}%</output></label>{/if}
+        <div class="brush-reset"><span>{textEntry ? $t("편집 중인 글에 적용됩니다.") : $t("현재 도구에만 적용됩니다.")}</span><button onclick={resetBrush}>{$t("기본 펜으로")}</button></div>
+        <div class="preset-save"><select aria-label={$t("저장할 프리셋")} bind:value={presetSlot}>{#each settings.presets as preset, i}<option value={i}>{i + 1}. {preset.name}</option>{/each}</select><button onclick={savePreset}>{$t("현재 도구 저장")}</button></div>
         {#if presetStatus}<p role="status">{presetStatus}</p>{/if}
-        <p>1–6 색상 · [ ] 굵기 · Shift+1–3 프리셋</p>
+        <p>{$t("1–6 색상 · [ ] 굵기 · Shift+1–3 프리셋")}</p>
       </div>
     {/snippet}
   </ToolbarFrame>
-  <div class="mode-hint"><span class="hint-dot"></span><strong>{TOOL_LABELS[tool]}</strong><span class="hint-separator"></span>{#if tool === 'text'}빈 곳에 새 글 · 기존 글을 클릭해 수정{:else if tool === 'eraser'}그림을 문지르면 획 단위로 지워집니다{:else if tool === 'arrow'}드래그로 연결 · Shift로 45° 방향 맞추기{:else if tool === 'highlighter'}글자를 가리지 않고 강조하세요{:else}직접 지우기 전까지 남아 있습니다{/if}<span class="hint-count">{annotationCount}개</span></div>
+  <div class="mode-hint"><span class="hint-dot"></span><strong>{$t(TOOL_LABELS[tool])}</strong><span class="hint-separator"></span>{#if tool === 'text'}{$t("빈 곳에 새 글 · 기존 글을 클릭해 수정")}{:else if tool === 'eraser'}{$t("그림을 문지르면 획 단위로 지워집니다")}{:else if tool === 'arrow'}{$t("드래그로 연결 · Shift로 45° 방향 맞추기")}{:else if tool === 'highlighter'}{$t("글자를 가리지 않고 강조하세요")}{:else}{$t("직접 지우기 전까지 남아 있습니다")}{/if}<span class="hint-count">{$t("{0}개", [annotationCount])}</span></div>
 {:else if !native}
-  <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>다시 그리기</button><span>그림은 유지됩니다 · {currentDisplay?.name ?? '미리보기'}</span></div>
+  <div class="preview-resume"><button class="primary" onclick={() => bridge.setMode('draw').then(acceptState)}>{$t("다시 그리기")}</button><span>{$t("그림은 유지됩니다 ·")} {currentDisplay?.name ?? $t("미리보기")}</span></div>
 {/if}
 
 {#if textEntry}
   <div bind:this={textEditor} class="text-editor" style:width={`${editorWidth()}px`} style:left={`${textEntry.x}px`} style:top={`${textEntry.y}px`}>
-    <div class="text-editor-heading"><button aria-label="텍스트 이동" title="드래그 또는 방향키로 이동 · Shift+방향키 10px" onpointerdown={startTextMove} onpointermove={moveText} onpointerup={endTextMove} onpointercancel={endTextMove} onlostpointercapture={endTextMove} onkeydown={textMoveKey}><Icon name="grip" size={15} />드래그로 이동</button><span>{textEntry.original ? '텍스트 수정' : '새 텍스트'}</span></div>
-    <textarea bind:this={textarea} bind:value={textEntry.value} aria-label="화면에 입력할 텍스트" placeholder="텍스트 입력" wrap="off" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:width={`${editorWidth()}px`} style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
-    <div class="text-format" aria-label="편집 중인 텍스트 서식">
-      <div class="text-format-colors">{#each settings.quickColors as color}<button aria-label={`텍스트 색상 ${color}`} aria-pressed={textEntry.color === color} class:chosen={textEntry.color === color} style:background={color} onclick={() => changeColor(color)}></button>{/each}</div>
-      <label>크기 <input aria-label="편집 중인 글자 크기" type="number" min="8" max="144" step="2" value={textEntry.fontSize} oninput={(e) => { const n = Number(e.currentTarget.value); if (n >= 8 && n <= 144) setSize(n); }} onchange={(e) => { if (textEntry) { setSize(Number(e.currentTarget.value) || textEntry.fontSize); e.currentTarget.value = String(textEntry.fontSize); } }} /><span>px</span></label>
+    <div class="text-editor-heading"><button aria-label={$t("텍스트 이동")} title={$t("드래그 또는 방향키로 이동 · Shift+방향키 10px")} onpointerdown={startTextMove} onpointermove={moveText} onpointerup={endTextMove} onpointercancel={endTextMove} onlostpointercapture={endTextMove} onkeydown={textMoveKey}><Icon name="grip" size={15} />{$t("드래그로 이동")}</button><span>{textEntry.original ? $t("텍스트 수정") : $t("새 텍스트")}</span></div>
+    <textarea bind:this={textarea} bind:value={textEntry.value} aria-label={$t("화면에 입력할 텍스트")} placeholder={$t("텍스트 입력")} wrap="off" maxlength="10000" rows={Math.min(8, textEntry.value.split('\n').length + 1)} spellcheck="false" style:width={`${editorWidth()}px`} style:color={textEntry.color} style:font-family={FONT_FAMILY} style:font-size={`${textEntry.fontSize}px`} style:line-height={TEXT_LINE_HEIGHT} onkeydown={textKey} oncompositionstart={() => composing = true} oncompositionend={() => { composing = false; compositionEndedAt = performance.now(); }}></textarea>
+    <div class="text-format" aria-label={$t("편집 중인 텍스트 서식")}>
+      <div class="text-format-colors">{#each settings.quickColors as color}<button aria-label={$t("텍스트 색상 {0}", [color])} aria-pressed={textEntry.color === color} class:chosen={textEntry.color === color} style:background={color} onclick={() => changeColor(color)}></button>{/each}</div>
+      <label>{$t("크기")} <input aria-label={$t("편집 중인 글자 크기")} type="number" min="8" max="144" step="2" value={textEntry.fontSize} oninput={(e) => { const n = Number(e.currentTarget.value); if (n >= 8 && n <= 144) setSize(n); }} onchange={(e) => { if (textEntry) { setSize(Number(e.currentTarget.value) || textEntry.fontSize); e.currentTarget.value = String(textEntry.fontSize); } }} /><span>px</span></label>
     </div>
-    <div class="text-editor-actions"><span>{textEntry.original ? '수정 중 · ' : ''}Enter 완료 · Shift+Enter 줄바꿈 · Esc 취소</span><button aria-label="텍스트 취소" onclick={cancelText}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label="텍스트 완료" onclick={commitText}><Icon name="check" size={16} />완료</button></div>
+    <div class="text-editor-actions"><span>{textEntry.original ? $t("수정 중 · ") : ''}{$t("Enter 완료 · Shift+Enter 줄바꿈 · Esc 취소")}</span><button aria-label={$t("텍스트 취소")} onclick={cancelText}><Icon name="close" size={16} /></button><button class="text-confirm" aria-label={$t("텍스트 완료")} onclick={commitText}><Icon name="check" size={16} />{$t("완료")}</button></div>
   </div>
 {/if}
-{#if error}<div class="overlay-error error-box" role="alert"><span>{error}</span><button onclick={() => action(() => bridge.setMode('interact'))}>앱 조작으로 돌아가기</button><button aria-label="알림 닫기" onclick={() => error = ''}><Icon name="close" size={16} /></button></div>{/if}
+{#if error}<div class="overlay-error error-box" role="alert"><span>{$t(error)}</span><button onclick={() => action(() => bridge.setMode('interact'))}>{$t("앱 조작으로 돌아가기")}</button><button aria-label={$t("알림 닫기")} onclick={() => error = ''}><Icon name="close" size={16} /></button></div>{/if}

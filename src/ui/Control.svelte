@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, setLanguage } from '../app/i18n';
   import { version as appVersion } from '../../package.json';
   import { onMount } from 'svelte';
   import { bridge, message, native, shortcutLabel } from '../app/bridge';
@@ -26,6 +27,7 @@
   function accept(next: AppState) {
     if (appState && next.revision < appState.revision) return;
     appState = next;
+    setLanguage(next.settings.language);
     const shortcuts = dirty ? { toggleShortcut: draft.toggleShortcut, clearShortcut: draft.clearShortcut, visibilityShortcut: draft.visibilityShortcut } : {};
     draft = { ...structuredClone(next.settings), ...optimistic, ...shortcuts };
   }
@@ -85,85 +87,89 @@
 <div class="control-shell">
   <aside class="sidebar">
     <div class="brand"><span class="brand-mark"><Icon name="pen" size={24} /></span><span>my brush<span class="brand-caption">SCREEN ANNOTATION</span></span></div>
-    <nav aria-label="주 메뉴">
-      <button class:active={tab === 'start'} onclick={() => tab = 'start'}><Icon name="pen" />시작하기</button>
-      <button class:active={tab === 'settings'} onclick={() => tab = 'settings'}><Icon name="settings" />설정</button>
-      <button class:active={tab === 'about'} onclick={() => tab = 'about'}><Icon name="info" />앱 정보</button>
+    <nav aria-label={$t("주 메뉴")}>
+      <button class:active={tab === 'start'} onclick={() => tab = 'start'}><Icon name="pen" />{$t("시작하기")}</button>
+      <button class:active={tab === 'settings'} onclick={() => tab = 'settings'}><Icon name="settings" />{$t("설정")}</button>
+      <button class:active={tab === 'about'} onclick={() => tab = 'about'}><Icon name="info" />{$t("앱 정보")}</button>
     </nav>
-    <div class="sidebar-bottom"><span class="status-dot" class:drawing={appState?.mode === 'draw'}></span>{appState?.mode === 'draw' ? '그리는 중' : appState ? '사용 준비 완료' : '연결 중'}<span class="version">v{appVersion}</span></div>
+    <div class="sidebar-bottom"><span class="status-dot" class:drawing={appState?.mode === 'draw'}></span>{appState?.mode === 'draw' ? $t("그리는 중") : appState ? $t("사용 준비 완료") : $t("연결 중")}<span class="version">v{appVersion}</span></div>
   </aside>
   <main class="control-main">
-    <header class="page-heading"><span>{tab === 'start' ? '설명에 필요한 만큼만.' : tab === 'settings' ? '나에게 맞는 도구로.' : '함께 만드는 작은 도구.'}</span><span class="local-label">{native ? '오프라인으로 작동' : '브라우저 미리보기'}</span></header>
-    {#if error || appState?.error}<div class="error-box" role="alert">{error || appState?.error}</div>{/if}
-    {#if appState?.clearUndoToken != null}<div class="session-actions"><button class="secondary" onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={18} />방금 지운 필기 되돌리기</button></div>{/if}
+    <header class="page-heading"><span>{tab === 'start' ? $t("설명에 필요한 만큼만.") : tab === 'settings' ? $t("나에게 맞는 도구로.") : $t("함께 만드는 작은 도구.")}</span><span class="local-label">{native ? $t("오프라인으로 작동") : $t("브라우저 미리보기")}</span></header>
+    {#if error || appState?.error}<div class="error-box" role="alert">{$t(error || appState?.error || '')}</div>{/if}
+    {#if appState?.clearUndoToken != null}<div class="session-actions"><button class="secondary" onclick={() => { const token = appState?.clearUndoToken; if (token != null) void action(() => bridge.undoClear(token)); }}><Icon name="undo" size={18} />{$t("방금 지운 필기 되돌리기")}</button></div>{/if}
     {#if tab === 'start'}
       <section class="welcome">
         <div class="eyebrow">YOUR SCREEN, YOUR CANVAS</div>
-        <h1>화면 위에,<br /><span>설명을 더하세요.</span></h1>
-        <p>강조하고 싶은 곳에 가볍게 그려 보세요.<br />직접 지우기 전까지, 설명은 그대로 남습니다.</p>
-        <button class="primary" disabled={!ready} onclick={start}><Icon name="pen" size={18} />그리기 시작<kbd>{shortcutLabel(appState?.settings.toggleShortcut ?? DEFAULT_SETTINGS.toggleShortcut)}</kbd></button>
-        <div class="ink-sample" aria-hidden="true"><svg viewBox="0 0 240 140"><path class="sample-line" d="M20 103Q64 65 91 85T173 57T215 77" /><path class="sample-underline" d="M28 117Q116 122 212 99" /><circle cx="205" cy="28" r="15" /><path class="sample-spark" d="m168 17 6 5m53 30 7 1m-50-48-1 7" /></svg><span>이 순간을 짚어 주세요</span></div>
+        <h1>{$t("화면 위에,")}<br /><span>{$t("설명을 더하세요.")}</span></h1>
+        <p>{$t("강조하고 싶은 곳에 가볍게 그려 보세요.")}<br />{$t("직접 지우기 전까지, 설명은 그대로 남습니다.")}</p>
+        <button class="primary" disabled={!ready} onclick={start}><Icon name="pen" size={18} />{$t("그리기 시작")}<kbd>{shortcutLabel(appState?.settings.toggleShortcut ?? DEFAULT_SETTINGS.toggleShortcut)}</kbd></button>
+        <div class="ink-sample" aria-hidden="true"><svg viewBox="0 0 240 140"><path class="sample-line" d="M20 103Q64 65 91 85T173 57T215 77" /><path class="sample-underline" d="M28 117Q116 122 212 99" /><circle cx="205" cy="28" r="15" /><path class="sample-spark" d="m168 17 6 5m53 30 7 1m-50-48-1 7" /></svg><span>{$t("이 순간을 짚어 주세요")}</span></div>
       </section>
-      <div class="session-actions"><button class="secondary" disabled={!ready} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={18} />{appState?.annotationsVisible ? '필기 잠시 숨기기' : '숨긴 필기 다시 표시'}<kbd>{shortcutLabel(draft.visibilityShortcut)}</kbd></button><span>{appState?.annotationsVisible ? '내용과 실행 취소 기록은 유지됩니다.' : '필기를 숨겼습니다. 다시 그리면 자동으로 표시됩니다.'}</span></div>
+      <div class="session-actions"><button class="secondary" disabled={!ready} onclick={() => action(bridge.toggleAnnotations)}><Icon name="eye" size={18} />{appState?.annotationsVisible ? $t("필기 잠시 숨기기") : $t("숨긴 필기 다시 표시")}<kbd>{shortcutLabel(draft.visibilityShortcut)}</kbd></button><span>{appState?.annotationsVisible ? $t("내용과 실행 취소 기록은 유지됩니다.") : $t("필기를 숨겼습니다. 다시 그리면 자동으로 표시됩니다.")}</span></div>
       <section class="display-card">
         <div class="card-icon"><Icon name="monitor" size={24} /></div>
-        <div class="display-details"><h2>그릴 화면</h2><p>{selected ? `${Math.round(selected.width)} × ${Math.round(selected.height)} · ${Math.round(selected.scaleFactor * 100)}% 배율` : '화면을 찾고 있습니다'}</p></div>
-        <select aria-label="그릴 화면 선택" value={appState?.activeDisplayId ?? ''} disabled={!ready} onchange={(e) => { const selectedId = e.currentTarget.value; void action(async () => accept(await bridge.selectDisplay(selectedId))); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as display}<option value={display.id}>{display.name}{display.isPrimary ? ' · 기본' : ''}</option>{/each}</select>
+        <div class="display-details"><h2>{$t("그릴 화면")}</h2><p>{selected ? $t("{0} × {1} · {2}% 배율", [Math.round(selected.width), Math.round(selected.height), Math.round(selected.scaleFactor * 100)]) : $t("화면을 찾고 있습니다")}</p></div>
+        <select aria-label={$t("그릴 화면 선택")} value={appState?.activeDisplayId ?? ''} disabled={!ready} onchange={(e) => { const selectedId = e.currentTarget.value; void action(async () => accept(await bridge.selectDisplay(selectedId))); }}>{#each appState?.displays.filter((d) => d.connected) ?? [] as display}<option value={display.id}>{$t(display.name)}{display.isPrimary ? $t(" · 기본") : ''}</option>{/each}</select>
       </section>
-      <section class="quick-guide" aria-label="사용 순서">
-        <div><span class="step-number">01</span><h3>그리고</h3><p>펜·색상·굵기를 골라<br />필요한 곳에 표시하세요.</p></div>
-        <div><span class="step-number">02</span><h3>그대로 두고</h3><p><kbd>Esc</kbd>로 앱 조작에 복귀해도<br />그림은 남아 있습니다.</p></div>
-        <div><span class="step-number">03</span><h3>가볍게 지우세요</h3><p><kbd>{shortcutLabel(appState?.settings.clearShortcut ?? DEFAULT_SETTINGS.clearShortcut)}</kbd><br />부드럽게 지워집니다.</p></div>
+      <section class="quick-guide" aria-label={$t("사용 순서")}>
+        <div><span class="step-number">01</span><h3>{$t("그리고")}</h3><p>{$t("펜·색상·굵기를 골라")}<br />{$t("필요한 곳에 표시하세요.")}</p></div>
+        <div><span class="step-number">02</span><h3>{$t("그대로 두고")}</h3><p>{$t("{0}로 앱 조작에 복귀해도 그림은 남아 있습니다.", ["Esc"])}</p></div>
+        <div><span class="step-number">03</span><h3>{$t("가볍게 지우세요")}</h3><p><kbd>{shortcutLabel(appState?.settings.clearShortcut ?? DEFAULT_SETTINGS.clearShortcut)}</kbd><br />{$t("부드럽게 지워집니다.")}</p></div>
       </section>
-      <div class="sharing-note"><Icon name="monitor" size={17} /><p>화면공유는 <strong>모니터 전체</strong>로 선택해 주세요. 특정 앱 창만 공유하면 그림이 전달되지 않을 수 있습니다.</p></div>
+      <div class="sharing-note"><Icon name="monitor" size={17} /><p>{$t("화면공유는")} <strong>{$t("모니터 전체")}</strong>{$t("로 선택해 주세요. 특정 앱 창만 공유하면 그림이 전달되지 않을 수 있습니다.")}</p></div>
     {:else if tab === 'settings'}
-      <div class="settings-heading"><h1>설정</h1><p>시작 기본값을 저장합니다. 바꾼 값은 현재 도구에도 바로 적용됩니다.</p></div>
-      {#if appearanceError}<div class="error-box" role="alert">{appearanceError}</div>{/if}
+      <div class="settings-heading"><h1>{$t("설정")}</h1><p>{$t("시작 기본값을 저장합니다. 바꾼 값은 현재 도구에도 바로 적용됩니다.")}</p></div>
+      {#if appearanceError}<div class="error-box" role="alert">{$t(appearanceError)}</div>{/if}
       <form onsubmit={(e) => { e.preventDefault(); void save(); }}>
         <fieldset disabled={!ready}>
-        <section class="settings-section"><h2><Icon name="pen" size={18} />시작 기본 펜</h2>
+        <section class="settings-section"><h2>{$t('언어 / Language')}</h2>
+          <div class="setting-row"><label for="app-language">{$t('앱 언어')}</label><select id="app-language" value={draft.language} onchange={(e) => appearance({ language: e.currentTarget.value as AppSettings['language'] })}><option value="ko">한국어</option><option value="en">English</option></select></div>
+          <p class="field-hint">{$t('언어를 바꾸면 모든 창과 메뉴에 바로 적용됩니다. 필기와 프리셋 이름은 바뀌지 않습니다.')}</p>
+        </section>
+        <section class="settings-section"><h2><Icon name="pen" size={18} />{$t("시작 기본 펜")}</h2>
           <div class="pen-preview" style:--ink={draft.color}><svg viewBox="0 0 360 70" aria-hidden="true"><path d="M18 47C60 10 70 64 112 34S159 57 210 27S277 40 337 23" fill="none" stroke="currentColor" stroke-width={draft.width} stroke-linecap="round" /></svg><span>{draft.width}px <code>{draft.color.toUpperCase()}</code></span></div>
           <div class="settings-palette"><ColorPalette value={draft.color} colors={draft.quickColors} onchange={(color) => appearance({ color })} onpalettechange={(quickColors) => appearance({ quickColors })} /></div>
-          <div class="setting-row"><label for="pen-width">펜 굵기</label><div class="range-value"><input id="pen-width" type="range" min="1" max="32" step="1" value={draft.width} oninput={(e) => appearance({ width: Number(e.currentTarget.value) })} /><output>{draft.width}px</output></div></div>
-          <div class="setting-row"><label for="eraser-size">지우개 크기</label><div class="range-value"><input id="eraser-size" type="range" min="16" max="128" step="4" value={draft.eraserSize} oninput={(e) => appearance({ eraserSize: Number(e.currentTarget.value) })} /><output>{draft.eraserSize}px</output></div></div>
-          <div class="setting-row"><label for="text-size">글자 크기</label><div class="range-value"><input id="text-size" type="range" min="12" max="96" step="2" value={draft.textSize} oninput={(e) => appearance({ textSize: Number(e.currentTarget.value) })} /><output>{draft.textSize}px</output></div></div>
-          <p class="appearance-status" role="status">{savingAppearance ? '저장 중…' : appearanceError ? '변경을 저장하지 못했습니다.' : '자동 저장 · 도구막대에서 바꾼 색·굵기는 이 기본값을 바꾸지 않습니다.'}</p>
+          <div class="setting-row"><label for="pen-width">{$t("펜 굵기")}</label><div class="range-value"><input id="pen-width" type="range" min="1" max="32" step="1" value={draft.width} oninput={(e) => appearance({ width: Number(e.currentTarget.value) })} /><output>{draft.width}px</output></div></div>
+          <div class="setting-row"><label for="eraser-size">{$t("지우개 크기")}</label><div class="range-value"><input id="eraser-size" type="range" min="16" max="128" step="4" value={draft.eraserSize} oninput={(e) => appearance({ eraserSize: Number(e.currentTarget.value) })} /><output>{draft.eraserSize}px</output></div></div>
+          <div class="setting-row"><label for="text-size">{$t("글자 크기")}</label><div class="range-value"><input id="text-size" type="range" min="12" max="96" step="2" value={draft.textSize} oninput={(e) => appearance({ textSize: Number(e.currentTarget.value) })} /><output>{draft.textSize}px</output></div></div>
+          <p class="appearance-status" role="status">{savingAppearance ? $t("저장 중…") : appearanceError ? $t("변경을 저장하지 못했습니다.") : $t("자동 저장 · 도구막대에서 바꾼 색·굵기는 이 기본값을 바꾸지 않습니다.")}</p>
         </section>
-        <section class="settings-section"><h2><Icon name="pen" size={18} />빠른 프리셋</h2>
-          <p class="field-hint">도구막대의 1·2·3 버튼 또는 Shift+1–3으로 불러옵니다. 이름은 입력을 마치면 저장됩니다.</p>
+        <section class="settings-section"><h2><Icon name="pen" size={18} />{$t("빠른 프리셋")}</h2>
+          <p class="field-hint">{$t("도구막대의 1·2·3 버튼 또는 Shift+1–3으로 불러옵니다. 이름은 입력을 마치면 저장됩니다.")}</p>
           {#each draft.presets as preset, i}
             <div class="preset-setting">
               <span class="preset-chip" style:background={preset.brush.color}>{i + 1}</span>
-              <div class="preset-details"><input aria-label={`프리셋 ${i + 1} 이름`} maxlength="24" value={preset.name} onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.currentTarget.blur(); } }} onchange={(e) => { const name = e.currentTarget.value; void action(async () => accept(await bridge.updatePreset(i, name))); }} /><small>{TOOL_LABELS[preset.brush.tool]} · {preset.brush.tool === 'text' ? preset.brush.textSize : preset.brush.tool === 'highlighter' ? preset.brush.highlighterWidth : preset.brush.width}px{preset.brush.tool === 'highlighter' ? ` · ${Math.round(preset.brush.highlighterOpacity * 100)}%` : ''} · {preset.brush.color.toUpperCase()}</small></div>
-              <button type="button" class="secondary" onclick={() => action(async () => accept(await bridge.updateBrush(preset.brush, appState!.brushGeneration)))}>불러오기</button>
-              <button type="button" class="secondary" onclick={() => action(async () => { if (appState) accept(await bridge.updatePreset(i, undefined, appState.brush)); })}>현재 도구로 저장</button>
+              <div class="preset-details"><input aria-label={$t("프리셋 {0} 이름", [i + 1])} maxlength="24" value={preset.name} onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.currentTarget.blur(); } }} onchange={(e) => { const name = e.currentTarget.value; void action(async () => accept(await bridge.updatePreset(i, name))); }} /><small>{$t(TOOL_LABELS[preset.brush.tool])} · {preset.brush.tool === 'text' ? preset.brush.textSize : preset.brush.tool === 'highlighter' ? preset.brush.highlighterWidth : preset.brush.width}px{preset.brush.tool === 'highlighter' ? ` · ${Math.round(preset.brush.highlighterOpacity * 100)}%` : ''} · {preset.brush.color.toUpperCase()}</small></div>
+              <button type="button" class="secondary" onclick={() => action(async () => accept(await bridge.updateBrush(preset.brush, appState!.brushGeneration)))}>{$t("불러오기")}</button>
+              <button type="button" class="secondary" onclick={() => action(async () => { if (appState) accept(await bridge.updatePreset(i, undefined, appState.brush)); })}>{$t("현재 도구로 저장")}</button>
             </div>
           {/each}
         </section>
-        <section class="settings-section"><h2><Icon name="cursor-halo" size={18} />커서 강조</h2>
-          <label class="checkbox-row"><span><strong>선택한 화면에서 커서 강조</strong><small>앱 조작 중에도 표시합니다. 앱을 다시 실행하면 꺼집니다.</small></span><input type="checkbox" checked={appState?.cursorEnabled ?? false} onchange={() => action(bridge.toggleCursor)} /></label>
-          <div class="cursor-settings-preview"><span class="cursor-sample" style:--cursor-color={draft.cursor.color} style:width={`${draft.cursor.size}px`} style:height={`${draft.cursor.size}px`}><Icon name="pointer" size={18} /></span><div class="cursor-colors">{#each draft.quickColors as color}<button type="button" aria-label={`커서 색상 ${color}`} aria-pressed={draft.cursor.color === color} style:background={color} onclick={() => appearance({ cursor: { ...draft.cursor, color } })}></button>{/each}</div></div>
-          <div class="setting-row"><label for="cursor-size">강조 원 크기</label><div class="range-value"><input id="cursor-size" type="range" min="24" max="96" step="2" value={draft.cursor.size} oninput={(e) => appearance({ cursor: { ...draft.cursor, size: Number(e.currentTarget.value) } })} /><output>{draft.cursor.size}px</output></div></div>
-          <label class="checkbox-row"><span><strong>클릭 위치 표시</strong><small>왼쪽 클릭에 짧은 원을 표시합니다.</small></span><input type="checkbox" checked={draft.cursor.showClicks} onchange={(e) => appearance({ cursor: { ...draft.cursor, showClicks: e.currentTarget.checked } })} /></label>
-          <p class="field-hint">그리기 중 C 또는 메뉴에서 켜고 끕니다. 꺼져 있을 때 위치 확인도 멈춥니다.</p>
+        <section class="settings-section"><h2><Icon name="cursor-halo" size={18} />{$t("커서 강조")}</h2>
+          <label class="checkbox-row"><span><strong>{$t("선택한 화면에서 커서 강조")}</strong><small>{$t("앱 조작 중에도 표시합니다. 앱을 다시 실행하면 꺼집니다.")}</small></span><input type="checkbox" checked={appState?.cursorEnabled ?? false} onchange={() => action(bridge.toggleCursor)} /></label>
+          <div class="cursor-settings-preview"><span class="cursor-sample" style:--cursor-color={draft.cursor.color} style:width={`${draft.cursor.size}px`} style:height={`${draft.cursor.size}px`}><Icon name="pointer" size={18} /></span><div class="cursor-colors">{#each draft.quickColors as color}<button type="button" aria-label={$t("커서 색상 {0}", [color])} aria-pressed={draft.cursor.color === color} style:background={color} onclick={() => appearance({ cursor: { ...draft.cursor, color } })}></button>{/each}</div></div>
+          <div class="setting-row"><label for="cursor-size">{$t("강조 원 크기")}</label><div class="range-value"><input id="cursor-size" type="range" min="24" max="96" step="2" value={draft.cursor.size} oninput={(e) => appearance({ cursor: { ...draft.cursor, size: Number(e.currentTarget.value) } })} /><output>{draft.cursor.size}px</output></div></div>
+          <label class="checkbox-row"><span><strong>{$t("클릭 위치 표시")}</strong><small>{$t("왼쪽 클릭에 짧은 원을 표시합니다.")}</small></span><input type="checkbox" checked={draft.cursor.showClicks} onchange={(e) => appearance({ cursor: { ...draft.cursor, showClicks: e.currentTarget.checked } })} /></label>
+          <p class="field-hint">{$t("그리기 중 C 또는 메뉴에서 켜고 끕니다. 꺼져 있을 때 위치 확인도 멈춥니다.")}</p>
         </section>
-        <section class="settings-section"><h2><Icon name="keyboard" size={18} />단축키</h2>
-          <div class="setting-row"><label for="toggle-shortcut">그리기 / 앱 조작</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>
-          <div class="setting-row"><label for="clear-shortcut">전체 지우기</label><ShortcutRecorder id="clear-shortcut" value={draft.clearShortcut} onchange={(value) => { draft.clearShortcut = value; change(); }} {capture} /></div>
-          <div class="setting-row"><label for="visibility-shortcut">필기 숨기기 / 다시 표시</label><ShortcutRecorder id="visibility-shortcut" value={draft.visibilityShortcut} onchange={(value) => { draft.visibilityShortcut = value; change(); }} {capture} /><button type="button" class="secondary" onclick={() => { draft.visibilityShortcut = ''; change(); }}>해제</button></div>
-          <p class="field-hint">입력칸을 클릭하고 원하는 키를 함께 누른 뒤 놓으세요. ‘단축키 적용’을 누르면 사용됩니다. 다른 앱의 단축키·특수문자 입력과 겹치면 조합을 바꿔 주세요.</p>
-          <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; draft.visibilityShortcut = DEFAULT_SETTINGS.visibilityShortcut; change(); }}>왼손 추천 조합</button><span class="success" role="status">{saved ? '단축키를 적용했습니다.' : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>단축키 적용</button></div>
+        <section class="settings-section"><h2><Icon name="keyboard" size={18} />{$t("단축키")}</h2>
+          <div class="setting-row"><label for="toggle-shortcut">{$t("그리기 / 앱 조작")}</label><ShortcutRecorder id="toggle-shortcut" value={draft.toggleShortcut} onchange={(value) => { draft.toggleShortcut = value; change(); }} {capture} /></div>
+          <div class="setting-row"><label for="clear-shortcut">{$t("전체 지우기")}</label><ShortcutRecorder id="clear-shortcut" value={draft.clearShortcut} onchange={(value) => { draft.clearShortcut = value; change(); }} {capture} /></div>
+          <div class="setting-row"><label for="visibility-shortcut">{$t("필기 숨기기 / 다시 표시")}</label><ShortcutRecorder id="visibility-shortcut" value={draft.visibilityShortcut} onchange={(value) => { draft.visibilityShortcut = value; change(); }} {capture} /><button type="button" class="secondary" onclick={() => { draft.visibilityShortcut = ''; change(); }}>{$t("해제")}</button></div>
+          <p class="field-hint">{$t("입력칸을 클릭하고 원하는 키를 함께 누른 뒤 놓으세요. ‘단축키 적용’을 누르면 사용됩니다. 다른 앱의 단축키·특수문자 입력과 겹치면 조합을 바꿔 주세요.")}</p>
+          <div class="shortcut-actions"><button type="button" class="secondary" onclick={() => { draft.toggleShortcut = DEFAULT_SETTINGS.toggleShortcut; draft.clearShortcut = DEFAULT_SETTINGS.clearShortcut; draft.visibilityShortcut = DEFAULT_SETTINGS.visibilityShortcut; change(); }}>{$t("왼손 추천 조합")}</button><span class="success" role="status">{saved ? $t("단축키를 적용했습니다.") : ''}</span><button class="primary" type="submit" disabled={!ready || !dirty || recording}>{$t("단축키 적용")}</button></div>
         </section>
-        <section class="settings-section"><label class="checkbox-row"><span><strong>애니메이션 줄이기</strong><small>지우기 명령을 누르면 그림을 즉시 지웁니다.</small></span><input type="checkbox" checked={draft.reduceMotion} onchange={(e) => appearance({ reduceMotion: e.currentTarget.checked })} /></label></section>
-        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, visibilityShortcut, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; draft.visibilityShortcut = visibilityShortcut; change(); }}>기본값으로</button></div>
+        <section class="settings-section"><label class="checkbox-row"><span><strong>{$t("애니메이션 줄이기")}</strong><small>{$t("지우기 명령을 누르면 그림을 즉시 지웁니다.")}</small></span><input type="checkbox" checked={draft.reduceMotion} onchange={(e) => appearance({ reduceMotion: e.currentTarget.checked })} /></label></section>
+        <div class="settings-actions"><button type="button" class="secondary" onclick={() => { const { toggleShortcut, clearShortcut, visibilityShortcut, language: _language, ...defaults } = structuredClone(DEFAULT_SETTINGS); appearance(defaults); draft.toggleShortcut = toggleShortcut; draft.clearShortcut = clearShortcut; draft.visibilityShortcut = visibilityShortcut; change(); }}>{$t("기본값으로")}</button></div>
         </fieldset>
       </form>
     {:else}
-      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>My Brush</h1><p>설명을 오래 남기는 화면 드로잉 도구</p><span class="about-version">VERSION {appVersion}</span>
-        <div class="about-details"><div><span>원저작자</span><strong>김준현</strong></div><div><span>라이선스</span><strong>Apache License 2.0</strong></div><div><span>원본 저장소</span><strong>공개 준비 중</strong></div></div>
-        <p class="about-note">Copyright 2026 김준현<br />재배포 시 관련 저작권·출처 고지를 유지해 주세요.<br />라이선스 전문과 고지는 설치 배포물에 함께 제공됩니다.</p>
-        <p class="about-note">화면을 녹화하거나 서버로 전송하지 않습니다.<br />설정과 진단 로그를 이 기기에 저장하며, 로그에는 필기 내용을 담지 않습니다.<br />그림은 앱을 종료하면 사라집니다.</p>
-        <button class="secondary" onclick={() => action(bridge.quit)} disabled={busy}><Icon name="power" size={16} />앱 종료</button>
+      <section class="about-panel"><span class="brand-mark large"><Icon name="pen" size={36} /></span><h1>My Brush</h1><p>{$t("설명을 오래 남기는 화면 드로잉 도구")}</p><span class="about-version">VERSION {appVersion}</span>
+        <div class="about-details"><div><span>{$t("원저작자")}</span><strong>{$t("김준현")}</strong></div><div><span>{$t("라이선스")}</span><strong>Apache License 2.0</strong></div><div><span>{$t("원본 저장소")}</span><strong>{$t("공개 준비 중")}</strong></div></div>
+        <p class="about-note">{$t("Copyright 2026 김준현")}<br />{$t("재배포 시 관련 저작권·출처 고지를 유지해 주세요.")}<br />{$t("라이선스 전문과 고지는 설치 배포물에 함께 제공됩니다.")}</p>
+        <p class="about-note">{$t("화면을 녹화하거나 서버로 전송하지 않습니다.")}<br />{$t("설정과 진단 로그를 이 기기에 저장하며, 로그에는 필기 내용을 담지 않습니다.")}<br />{$t("그림은 앱을 종료하면 사라집니다.")}</p>
+        <button class="secondary" onclick={() => action(bridge.quit)} disabled={busy}><Icon name="power" size={16} />{$t("앱 종료")}</button>
       </section>
     {/if}
   </main>

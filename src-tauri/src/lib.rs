@@ -1,6 +1,8 @@
 mod cursor;
 mod diagnostics;
+mod i18n;
 mod model;
+use i18n::tr;
 mod platform;
 mod settings;
 mod shortcut_registry;
@@ -27,7 +29,12 @@ struct RuntimeState {
     capturing_shortcut: bool,
 }
 struct Session(Mutex<RuntimeState>);
+struct SettingsMenu(MenuItem<tauri::Wry>);
 struct TrayShortcuts {
+    control: MenuItem<tauri::Wry>,
+    interact: MenuItem<tauri::Wry>,
+    clear_current: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
     draw: MenuItem<tauri::Wry>,
     clear: MenuItem<tauri::Wry>,
     visibility: MenuItem<tauri::Wry>,
@@ -36,6 +43,17 @@ struct TrayShortcuts {
 }
 impl TrayShortcuts {
     fn update(&self, settings: &AppSettings) -> tauri::Result<()> {
+        for (item, label) in [
+            (&self.control, "설정 열기"),
+            (&self.draw, "그리기"),
+            (&self.interact, "앱 조작으로 복귀 (입력 복구)"),
+            (&self.clear, "모든 화면 필기 지우기"),
+            (&self.clear_current, "선택한 화면 필기 지우기"),
+            (&self.undo_clear, "방금 지운 필기 되돌리기"),
+            (&self.quit, "My Brush 종료"),
+        ] {
+            item.set_text(tr(settings.language, label))?;
+        }
         // Native accelerators supply the right-aligned, platform-specific labels.
         self.draw.set_accelerator(Some(&settings.toggle_shortcut))?;
         self.clear.set_accelerator(Some(&settings.clear_shortcut))?;
@@ -140,18 +158,24 @@ fn emit_state(app: &tauri::AppHandle, data: &mut RuntimeState) {
     }
 
     if let Some(tray) = app.try_state::<TrayShortcuts>() {
-        let _ = tray.visibility.set_text(if data.app.annotations_visible {
-            "필기 잠시 숨기기"
-        } else {
-            "숨긴 필기 다시 표시"
-        });
+        let _ = tray.visibility.set_text(tr(
+            data.app.settings.language,
+            if data.app.annotations_visible {
+                "필기 잠시 숨기기"
+            } else {
+                "숨긴 필기 다시 표시"
+            },
+        ));
     }
     if let Some(tray) = app.try_state::<TrayShortcuts>() {
-        let _ = tray.cursor.set_text(if data.app.cursor_enabled {
-            "커서 강조 끄기"
-        } else {
-            "커서 강조 켜기"
-        });
+        let _ = tray.cursor.set_text(tr(
+            data.app.settings.language,
+            if data.app.cursor_enabled {
+                "커서 강조 끄기"
+            } else {
+                "커서 강조 켜기"
+            },
+        ));
     }
     data.app.revision += 1;
     let _ = app.emit("brush-state", &data.app);
@@ -195,7 +219,7 @@ fn ensure_overlay(
             .append_pair("display", id);
         let app_url = format!("index.html?{}", url.query().unwrap_or_default());
         let window = WebviewWindowBuilder::new(app, &name, WebviewUrl::App(app_url.into()))
-            .title("My Brush 필기")
+            .title(tr(data.app.settings.language, "My Brush 필기"))
             .transparent(true)
             .decorations(false)
             .shadow(false)
@@ -666,6 +690,14 @@ async fn update_settings(
             return Err(error);
         }
         d.app.settings = settings;
+        if let Some(menu) = app.try_state::<SettingsMenu>() {
+            let _ = menu.0.set_text(tr(d.app.settings.language, "설정…"));
+        }
+        for (label, window) in app.webview_windows() {
+            if label.starts_with("overlay-") {
+                let _ = window.set_title(&tr(d.app.settings.language, "My Brush 필기"));
+            }
+        }
         d.app.brush = brush;
         d.app.error = app
             .state::<TrayShortcuts>()
@@ -910,53 +942,60 @@ async fn quit_app(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), St
     .await
 }
 fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
+    let text = |key| tr(settings.language, key);
     let control = MenuItem::with_id(
         app,
         "control",
-        "설정 열기",
+        text("설정 열기"),
         true,
         Some("CommandOrControl+Comma"),
     )?;
-    let draw = MenuItem::with_id(app, "draw", "그리기", true, Some(&settings.toggle_shortcut))?;
+    let draw = MenuItem::with_id(
+        app,
+        "draw",
+        text("그리기"),
+        true,
+        Some(&settings.toggle_shortcut),
+    )?;
     let interact = MenuItem::with_id(
         app,
         "interact",
-        "앱 조작으로 복귀 (입력 복구)",
+        text("앱 조작으로 복귀 (입력 복구)"),
         true,
         Some("Escape"),
     )?;
     let clear = MenuItem::with_id(
         app,
         "clear",
-        "모든 화면 필기 지우기",
+        text("모든 화면 필기 지우기"),
         true,
         Some(&settings.clear_shortcut),
     )?;
     let undo_clear_item = MenuItem::with_id(
         app,
         "undo-clear",
-        "방금 지운 필기 되돌리기",
+        text("방금 지운 필기 되돌리기"),
         false,
         None::<&str>,
     )?;
-    let cursor = MenuItem::with_id(app, "cursor", "커서 강조 켜기", true, None::<&str>)?;
+    let cursor = MenuItem::with_id(app, "cursor", text("커서 강조 켜기"), true, None::<&str>)?;
     let clear_current_item = MenuItem::with_id(
         app,
         "clear-current",
-        "선택한 화면 필기 지우기",
+        text("선택한 화면 필기 지우기"),
         true,
         None::<&str>,
     )?;
     let visibility = MenuItem::with_id(
         app,
         "visibility",
-        "필기 잠시 숨기기",
+        text("필기 잠시 숨기기"),
         true,
         (!settings.visibility_shortcut.is_empty()).then_some(&settings.visibility_shortcut),
     )?;
     // Cmd+Q is already provided by the standard macOS application menu.
     let quit_shortcut = cfg!(target_os = "macos").then_some("Command+Q");
-    let quit = MenuItem::with_id(app, "quit", "My Brush 종료", true, quit_shortcut)?;
+    let quit = MenuItem::with_id(app, "quit", text("My Brush 종료"), true, quit_shortcut)?;
     let menu = Menu::with_items(
         app,
         &[
@@ -972,7 +1011,7 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         ],
     )?;
     TrayIconBuilder::with_id("brush")
-        .tooltip("My Brush — 화면 필기")
+        .tooltip("My Brush")
         .icon(tauri::image::Image::new_owned(tray_pixels(), 32, 32))
         .icon_as_template(true)
         .menu(&menu)
@@ -1032,6 +1071,10 @@ fn tray(app: &tauri::AppHandle, settings: &AppSettings) -> tauri::Result<()> {
         })
         .build(app)?;
     app.manage(TrayShortcuts {
+        control,
+        interact,
+        clear_current: clear_current_item,
+        quit,
         undo_clear: undo_clear_item,
         draw,
         clear,
@@ -1217,11 +1260,12 @@ pub fn run() {
                     let settings_item = MenuItem::with_id(
                         app,
                         "open-settings",
-                        "설정…",
+                        tr(loaded.language, "설정…"),
                         true,
                         Some("Command+Comma"),
                     )?;
                     submenu.insert(&settings_item, 1)?;
+                    app.manage(SettingsMenu(settings_item));
                 }
                 app.set_menu(menu)?;
             }

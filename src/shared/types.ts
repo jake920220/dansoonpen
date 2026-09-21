@@ -1,3 +1,4 @@
+export type Language = 'ko' | 'en';
 export type Mode = 'draw' | 'interact';
 export type Tool = 'pen' | 'eraser' | 'text' | 'arrow' | 'highlighter';
 export interface Point { x: number; y: number }
@@ -14,6 +15,7 @@ export interface BrushPreset { name: string; brush: BrushSettings }
 export interface CursorSettings { color: string; size: number; showClicks: boolean }
 export interface CursorFrame { displayId: string; x: number; y: number; visible: boolean; clicks: number; sequence: number }
 export interface AppSettings {
+  language: Language;
   eraserSize: number;
   cursor: CursorSettings;
   presets: BrushPreset[];
@@ -35,9 +37,10 @@ export interface SceneSnapshot { displayId: string; revision: number; clearGener
 export interface SceneUpdate { scene: SceneSnapshot; fadeOut: Annotation[]; fadeDurationMs: number }
 export interface SceneEdit { displayId: string; clearGeneration: number; added: Annotation[]; removedIds: string[] }
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: 'ko',
   cursor: { color: '#ffcf56', size: 48, showClicks: true },
   eraserSize: 48,
-  version: 5, color: '#ffcf56', width: 12, textSize: 40,
+  version: 6, color: '#ffcf56', width: 12, textSize: 40,
   presets: [
     { name: '기본 강조', brush: { eraserSize: 48, tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ffcf56', width: 12, textSize: 40 } },
     { name: '빨간 밑줄', brush: { eraserSize: 48, tool: 'pen', highlighterWidth: 24, highlighterOpacity: 0.32, color: '#ff6b6b', width: 4, textSize: 40 } },
