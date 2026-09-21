@@ -46,7 +46,7 @@ DansoonPen은 별도 화이트보드를 열지 않고 슬라이드·코드·사�
 | 여러 화면·언어로 강의할 때 | 앱에서 한국어·영어를 전환하고 하나의 공용 도구막대를 모니터 사이로 옮깁니다. |
 | 도구를 직접 살펴보고 개선할 때 | 계정·구독 없이 사용하며 Apache-2.0 소스를 공개합니다. Tauri/Rust와 OS WebView로 구현했습니다. |
 
-다른 도구에도 겹치는 기능이 있습니다. [DrawPen](https://github.com/DmytroVasin/DrawPen)은 여러 필기 도구와 macOS·Windows·Linux 지원을 제공하고, [gInk](https://github.com/geovens/gInk)도 오픈소스 화면 필기 도구입니다. 단순펜은 위 동작의 조합과 강의 흐름에 집중합니다. Apple Silicon Mac과 Windows x64에서 기본 사용을 확인했습니다. 다른 도구와의 메모리·속도 비교 측정은 아직 하지 않았습니다.
+단순펜은 위 기능을 함께 제공해 강의 중 필기와 앱 조작을 자연스럽게 이어가는 데 집중합니다. Apple Silicon Mac과 Windows x64에서 기본 사용을 확인했습니다. 다른 도구와의 메모리·속도 비교 측정은 아직 하지 않았습니다.
 
 ## 시작하기
 

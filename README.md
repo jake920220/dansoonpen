@@ -46,7 +46,7 @@ DansoonPen grew out of teaching with a screen brush: explanations often last lon
 | Work across languages and displays | Switch Korean/English in the app and move one shared toolbar between monitors. |
 | Inspect or adapt the tool | Apache-2.0 source, no account or subscription, and a Tauri/Rust implementation using the OS WebView. |
 
-Other tools also provide overlapping features: [DrawPen](https://github.com/DmytroVasin/DrawPen) offers multiple annotation tools and macOS/Windows/Linux support, and [gInk](https://github.com/geovens/gInk) is another open-source annotation tool. DansoonPen's emphasis is the combination above. Basic use has been checked on Apple Silicon Macs and Windows x64 PCs. No comparative memory or speed benchmark has been completed.
+DansoonPen focuses on these features working together throughout a lesson. Basic use has been checked on Apple Silicon Macs and Windows x64 PCs. No comparative memory or speed benchmark has been completed.
 
 ## Get started
 
