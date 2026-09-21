@@ -1,0 +1,78 @@
+name: Windows test installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out v0.7.0 release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 1dd83fb137545ad909eee425ea1869fb1fbfc44b
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26'
+          cache: npm
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt --component clippy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set 1.94.0
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Check frontend
+        run: npm run check
+      - name: Test frontend
+        run: npm test
+      - name: Check Rust formatting
+        run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - name: Test Rust on Windows
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Check Rust warnings
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - name: Build NSIS installer
+        run: npm run tauri build -- --bundles nsis
+      - name: Verify installation and license resources
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe')
+          if ($installers.Count -ne 1) { throw 'Expected exactly one NSIS installer' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'DansoonPenInstallCheck'
+          $process = Start-Process -FilePath $installers[0].FullName -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          foreach ($file in @('dansoonpen.exe', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.txt', 'licenses/NanumGothic-OFL.txt')) {
+            if (-not (Test-Path (Join-Path $installDir $file))) { throw "Missing installed file: $file" }
+          }
+          $version = (Get-Item (Join-Path $installDir 'dansoonpen.exe')).VersionInfo.ProductVersion
+          if ($version -notlike '0.7.0*') { throw "Unexpected product version: $version" }
+          New-Item -ItemType Directory -Path 'windows-release' | Out-Null
+          $asset = 'DansoonPen-0.7.0-Windows-x64-setup.exe'
+          Copy-Item $installers[0].FullName "windows-release/$asset"
+          $hash = (Get-FileHash "windows-release/$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $asset" | Set-Content 'windows-release/SHA256SUMS-Windows.txt' -Encoding utf8NoBOM
+          @{
+            sourceCommit = (git rev-parse HEAD)
+            version = $version
+            runner = 'windows-2022'
+            signature = (Get-AuthenticodeSignature "windows-release/$asset").Status.ToString()
+            installation = 'silent install and required resources passed'
+            nativeDrawing = 'not tested; awaiting real-device feedback'
+          } | ConvertTo-Json | Set-Content 'windows-release/build-info.json' -Encoding utf8NoBOM
+      - name: Save verified test installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: DansoonPen-0.7.0-Windows-x64
+          path: windows-release/
+          if-no-files-found: error
+          retention-days: 14
